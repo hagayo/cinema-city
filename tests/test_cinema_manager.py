@@ -19,6 +19,7 @@ def test_manager_adds_movie_to_catalog() -> None:
         duration_minutes=166,
         description="Science fiction epic.",
         genre=Genre.DRAMA,
+        ticket_price=40,
     )
 
     assert cinema.movies == [movie]
@@ -29,7 +30,7 @@ def test_manager_schedules_three_shows_in_every_hall() -> None:
     """One movie is scheduled three times in each of three halls."""
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA, 40)
 
     shows = manager.schedule_movie(movie, date(2026, 8, 23))
 
@@ -41,7 +42,7 @@ def test_scheduled_shows_have_different_non_overlapping_times() -> None:
     """Each hall receives three distinct, non-overlapping screening times."""
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA, 40)
 
     manager.schedule_movie(movie, date(2026, 8, 23))
 
@@ -54,42 +55,36 @@ def test_scheduled_shows_have_different_non_overlapping_times() -> None:
         )
 
 
-def test_schedule_movie_uses_integer_ticket_price() -> None:
-    """Scheduled ticket prices are stored as whole shekel integers."""
+def test_scheduled_shows_use_movie_ticket_price() -> None:
+    """Scheduled shows inherit the ticket price defined on the movie."""
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA, 50)
 
     shows = manager.schedule_movie(
         movie,
         date(2026, 8, 23),
         shows_per_hall=1,
-        ticket_price=50,
     )
 
     assert all(show.ticket_price == 50 for show in shows)
     assert all(isinstance(show.ticket_price, int) for show in shows)
 
 
-def test_schedule_movie_rejects_negative_ticket_price() -> None:
-    """Cinema manager rejects a negative ticket price."""
+def test_manager_rejects_invalid_movie_ticket_price() -> None:
+    """Movie creation rejects ticket prices outside the allowed range."""
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA)
 
     with pytest.raises(ValueError, match="price"):
-        manager.schedule_movie(
-            movie,
-            date(2026, 8, 23),
-            ticket_price=-1,
-        )
+        manager.add_movie("Dune", 120, "Science fiction epic.", Genre.DRAMA, 0)
 
 
 def test_schedule_movie_is_atomic_when_a_hall_has_too_few_slots() -> None:
     """No show is added if one hall cannot satisfy the scheduling request."""
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Long Movie", 180, "A long movie.", Genre.DRAMA)
+    movie = manager.add_movie("Long Movie", 180, "A long movie.", Genre.DRAMA, 40)
 
     cinema.halls[2].schedule.opening_time = time(22, 0)
     cinema.halls[2].schedule.closing_time = time(23, 0)

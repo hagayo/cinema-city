@@ -23,25 +23,25 @@ def test_default_hall_contains_four_hundred_seats() -> None:
 def test_movie_rejects_non_positive_id() -> None:
     """Movie IDs must be positive."""
     with pytest.raises(ValueError, match="Movie ID"):
-        Movie(0, "Dune", 166, "Description", Genre.DRAMA)
+        Movie(0, "Dune", 166, "Description", Genre.DRAMA, 40)
 
 
 def test_movie_rejects_empty_title() -> None:
     """Movie titles cannot be empty."""
     with pytest.raises(ValueError, match="title"):
-        Movie(1, " ", 166, "Description", Genre.DRAMA)
+        Movie(1, " ", 166, "Description", Genre.DRAMA, 40)
 
 
 def test_movie_rejects_non_positive_duration() -> None:
     """Movie duration must be positive."""
     with pytest.raises(ValueError, match="duration"):
-        Movie(1, "Dune", 0, "Description", Genre.DRAMA)
+        Movie(1, "Dune", 0, "Description", Genre.DRAMA, 40)
 
 
 def test_movie_description_has_maximum_length() -> None:
     """Movie description cannot exceed the configured maximum length."""
     with pytest.raises(ValueError, match="description"):
-        Movie(1, "Dune", 166, "x" * 301, Genre.DRAMA)
+        Movie(1, "Dune", 166, "x" * 301, Genre.DRAMA, 40)
 
 
 def test_seat_rejects_invalid_position() -> None:
@@ -154,3 +154,10 @@ def test_find_available_start_times_rejects_invalid_interval(interval: int) -> N
             count=1,
             interval_minutes=interval,
         )
+
+
+@pytest.mark.parametrize("ticket_price", [0, 100])
+def test_movie_rejects_ticket_price_outside_allowed_range(ticket_price: int) -> None:
+    """Movie ticket price must be between 1 and 99 NIS."""
+    with pytest.raises(ValueError, match="price"):
+        Movie(1, "Dune", 166, "Description", Genre.DRAMA, ticket_price)

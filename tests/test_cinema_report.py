@@ -19,6 +19,7 @@ class FakeStorageService:
             90,
             "Funny movie.",
             Genre.COMEDY,
+            40,
         )
         manager.schedule_movie(movie, date(2026, 8, 23), shows_per_hall=1)
         from types import SimpleNamespace

@@ -1,6 +1,6 @@
-# Cinema Booking V5.1
+# Cinema City
 
-V5.1 fixes the scheduling algorithm and tightens code quality.
+V5.11 fixes the scheduling algorithm and tightens code quality.
 
 ## Main changes
 
@@ -58,11 +58,36 @@ Movie creation and scheduling are separate manager operations.
 1. Add movie
 2. Schedule movie
 3. List movies
-4. Exit
+4. List shows by hall
+5. List bookings
+6. Exit
 ```
 
 `Add movie` only adds a movie to the catalog.
+### Add movie
 
+המנהל מוסיף סרט חדש עם:
+
+- שם הסרט
+- משך בדקות
+- תיאור
+- ז'אנר
+- מחיר כרטיס
+
+מחיר הכרטיס חייב להיות מספר שלם בין `1` ל-`99` ש"ח.
+אם לוחצים Enter בלי להקליד מחיר, נקבע מחיר ברירת מחדל של `40 NIS`.
+
+הז'אנרים הנתמכים:
+
+```text
+comedy
+drama
+thriller
+crime
+family
+```
+
+### Schedule movie
 `Schedule movie` asks for an existing movie by:
 
 - movie ID
@@ -129,6 +154,10 @@ data/
 ```
 
 Each file has its own repository:
+- `cinema_config.json` - הגדרת הקולנוע, האולמות והמושבים
+- `movies.json` - קטלוג הסרטים, הז'אנרים ומחירי הכרטיסים
+- `shows.json` - כל ההקרנות המתוזמנות
+- `bookings.json` - כל ההזמנות והמושבים שהוזמנו
 
 ```text
 CinemaConfigRepository

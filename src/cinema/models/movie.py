@@ -18,6 +18,7 @@ class Movie:
     duration_minutes: int
     description: str
     genre: Genre
+    ticket_price: int
 
     def __post_init__(self) -> None:
         """Validate movie data after object creation."""
@@ -38,3 +39,6 @@ class Movie:
                 f"Movie description cannot exceed "
                 f"{MAX_DESCRIPTION_LENGTH} characters"
             )
+
+        if not 1 <= self.ticket_price <= 99:
+            raise ValueError("Ticket price must be between 1 and 99 NIS")

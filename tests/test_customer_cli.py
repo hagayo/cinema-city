@@ -21,6 +21,7 @@ def create_cinema_with_show() -> Cinema:
         duration_minutes=120,
         description="Science fiction epic.",
         genre=Genre.DRAMA,
+        ticket_price=40,
     )
     manager.schedule_movie(
         movie=movie,
@@ -67,12 +68,14 @@ def test_filter_upcoming_shows_by_genre() -> None:
         120,
         "Drama description.",
         Genre.DRAMA,
+        40,
     )
     comedy = manager.add_movie(
         "Comedy Movie",
         90,
         "Comedy description.",
         Genre.COMEDY,
+        40,
     )
 
     manager.schedule_movie(

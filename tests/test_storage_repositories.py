@@ -30,13 +30,14 @@ def test_movie_repository_persists_movies(tmp_path) -> None:
     repository = MovieRepository(tmp_path / "movies.json")
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA, 40)
 
     repository.save(cinema.movies)
     loaded = repository.load()
 
     assert loaded == [movie]
     assert loaded[0].genre == Genre.DRAMA
+    assert loaded[0].ticket_price == 40
 
 
 def test_show_repository_persists_shows(tmp_path) -> None:
@@ -47,7 +48,7 @@ def test_show_repository_persists_shows(tmp_path) -> None:
 
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA, 40)
     manager.schedule_movie(movie, date(2026, 8, 23), shows_per_hall=1)
 
     config_repository.save(cinema)
@@ -71,7 +72,7 @@ def test_booking_repository_persists_bookings(tmp_path) -> None:
 
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
-    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA)
+    movie = manager.add_movie("Dune", 120, "Science fiction.", Genre.DRAMA, 40)
     show = manager.schedule_movie(
         movie,
         date(2026, 8, 23),

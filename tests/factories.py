@@ -10,6 +10,7 @@ def make_movie(
     title: str = "Back to the Future",
     duration_minutes: int = 120,
     genre: Genre = Genre.DRAMA,
+    ticket_price: int = 42,
 ) -> Movie:
     """Create a movie suitable for unit tests."""
     return Movie(
@@ -18,6 +19,7 @@ def make_movie(
         duration_minutes=duration_minutes,
         description="A short movie description.",
         genre=genre,
+        ticket_price=ticket_price,
     )
 
 

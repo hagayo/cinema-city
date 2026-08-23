@@ -1,1 +1,10 @@
-[]
+[
+  {
+    "movie_id": 1,
+    "title": "Python-Adventures",
+    "duration_minutes": 96,
+    "description": "the long journey of a python developer to the light",
+    "genre": "comedy",
+    "ticket_price": 40
+  }
+]

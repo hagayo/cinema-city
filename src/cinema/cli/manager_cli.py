@@ -2,7 +2,7 @@
 
 from datetime import date
 
-from cinema.models import Cinema, Genre, Movie
+from cinema.models import Booking, Cinema, Genre, Movie
 from cinema.services import CinemaManager
 from cinema.storage import StorageService
 
@@ -23,6 +23,27 @@ def read_positive_int(prompt: str) -> int:
             continue
 
         return value
+
+
+
+def read_ticket_price(prompt: str = "Ticket price [40 NIS]: ") -> int:
+    """Read a ticket price between 1 and 99, or use 40 when left empty."""
+    while True:
+        raw_value = input(prompt).strip()
+
+        if not raw_value:
+            return 40
+
+        try:
+            value = int(raw_value)
+        except ValueError:
+            print("Please enter a whole number between 1 and 99, or press Enter for 40.")
+            continue
+
+        if 1 <= value <= 99:
+            return value
+
+        print("Ticket price must be between 1 and 99 NIS.")
 
 
 def read_non_empty_text(prompt: str) -> str:
@@ -89,6 +110,7 @@ def add_movie_interactively(manager: CinemaManager) -> None:
         duration_minutes=read_positive_int("Duration in minutes: "),
         description=read_non_empty_text("Short description: "),
         genre=read_genre(),
+        ticket_price=read_ticket_price(),
     )
     print(f'Added movie #{movie.movie_id}: "{movie.title}"')
 
@@ -127,7 +149,56 @@ def list_movies(cinema: Cinema) -> None:
     for movie in cinema.movies:
         print(
             f"{movie.movie_id}. {movie.title} "
-            f"({movie.duration_minutes} minutes, {movie.genre.value})"
+            f"({movie.duration_minutes} minutes, {movie.genre.value}, "
+            f"{movie.ticket_price} NIS)"
+        )
+
+
+
+def list_shows_by_hall(cinema: Cinema) -> None:
+    """Ask for a hall and print its scheduled shows ordered by start time."""
+    hall_number = read_positive_int("Hall number: ")
+    hall = next(
+        (item for item in cinema.halls if item.hall_number == hall_number),
+        None,
+    )
+
+    if hall is None:
+        print(f"Hall {hall_number} does not exist.")
+        return
+
+    shows = sorted(hall.schedule.shows, key=lambda show: show.start_time)
+
+    if not shows:
+        print(f"No shows scheduled in hall {hall_number}.")
+        return
+
+    print(f"\nHall {hall_number} Shows")
+    for show in shows:
+        print(
+            f"#{show.show_id} | {show.movie.title} | {show.movie.genre.value} | "
+            f"{show.start_time:%Y-%m-%d %H:%M} - {show.end_time:%H:%M} | "
+            f"{show.ticket_price} NIS"
+        )
+
+
+def list_bookings(bookings: list[Booking]) -> None:
+    """Print all customer bookings ordered by booking ID."""
+    if not bookings:
+        print("No bookings.")
+        return
+
+    print("\nBookings")
+    for booking in sorted(bookings, key=lambda item: item.booking_id):
+        seats = ", ".join(
+            f"R{seat.row}-S{seat.seat_number}"
+            for seat in booking.seats
+        )
+        print(
+            f"#{booking.booking_id} | {booking.show.movie.title} | "
+            f"Show #{booking.show.show_id} | Hall {booking.show.hall_number} | "
+            f"{booking.show.start_time:%Y-%m-%d %H:%M} | "
+            f"Seats: {seats} | Total: {booking.total_price} NIS"
         )
 
 
@@ -143,7 +214,9 @@ def run_manager_cli() -> None:
             "1. Add movie\n"
             "2. Schedule movie\n"
             "3. List movies\n"
-            "4. Exit"
+            "4. List shows by hall\n"
+            "5. List bookings\n"
+            "6. Exit"
         )
 
         choice = input("Choose an option: ").strip()
@@ -157,6 +230,10 @@ def run_manager_cli() -> None:
         elif choice == "3":
             list_movies(cinema)
         elif choice == "4":
+            list_shows_by_hall(cinema)
+        elif choice == "5":
+            list_bookings(bookings)
+        elif choice == "6":
             repository.save(cinema, bookings)
             print("Goodbye.")
             return
