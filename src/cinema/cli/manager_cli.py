@@ -6,6 +6,10 @@ from cinema.models import Booking, Cinema, Genre, Movie
 from cinema.services import CinemaManager
 from cinema.storage import StorageService
 
+from cinema.services.cinema_manager import DEFAULT_TICKET_PRICE
+
+MAX_TICKET_PRICE = 99
+
 
 def read_positive_int(prompt: str) -> int:
     """Read a positive integer from standard input."""
@@ -32,7 +36,7 @@ def read_ticket_price(prompt: str = "Ticket price [40 NIS]: ") -> int:
         raw_value = input(prompt).strip()
 
         if not raw_value:
-            return 40
+            return DEFAULT_TICKET_PRICE
 
         try:
             value = int(raw_value)
@@ -40,7 +44,7 @@ def read_ticket_price(prompt: str = "Ticket price [40 NIS]: ") -> int:
             print("Please enter a whole number between 1 and 99, or press Enter for 40.")
             continue
 
-        if 1 <= value <= 99:
+        if 1 <= value <= MAX_TICKET_PRICE:
             return value
 
         print("Ticket price must be between 1 and 99 NIS.")

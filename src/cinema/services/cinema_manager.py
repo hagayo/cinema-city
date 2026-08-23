@@ -39,6 +39,7 @@ class CinemaManager:
         duration_minutes: int,
         description: str,
         genre: Genre,
+        ticket_price: int = DEFAULT_TICKET_PRICE,
     ) -> Movie:
         """Create a movie and add it to the cinema catalog."""
         movie = Movie(
@@ -47,6 +48,7 @@ class CinemaManager:
             duration_minutes=duration_minutes,
             description=description,
             genre=genre,
+            ticket_price=ticket_price,
         )
         self._cinema.movies.append(movie)
         self._next_movie_id += 1
@@ -57,7 +59,6 @@ class CinemaManager:
         movie: Movie,
         screening_date: date,
         shows_per_hall: int = DEFAULT_SHOWS_PER_HALL,
-        ticket_price: int = DEFAULT_TICKET_PRICE,
     ) -> tuple[MovieShow, ...]:
         """Schedule a movie several times in every cinema hall.
 
@@ -72,9 +73,6 @@ class CinemaManager:
 
         if shows_per_hall <= 0:
             raise ValueError("Shows per hall must be positive")
-
-        if ticket_price < 0:
-            raise ValueError("Ticket price cannot be negative")
 
         planned_shows: list[MovieShow] = []
         next_show_id = self._next_show_id
@@ -99,7 +97,7 @@ class CinemaManager:
                         movie=movie,
                         hall_number=hall.hall_number,
                         start_time=start_time,
-                        ticket_price=ticket_price,
+                        ticket_price=movie.ticket_price,
                     )
                 )
                 next_show_id += 1

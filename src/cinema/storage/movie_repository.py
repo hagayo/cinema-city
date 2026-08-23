@@ -32,6 +32,7 @@ class MovieRepository:
                 duration_minutes=int(item["duration_minutes"]),
                 description=str(item["description"]),
                 genre=Genre(str(item["genre"])),
+                ticket_price=int(item["ticket_price"]),
             )
             for item in data
         ]
@@ -47,6 +48,7 @@ class MovieRepository:
                 "duration_minutes": movie.duration_minutes,
                 "description": movie.description,
                 "genre": movie.genre.value,
+                "ticket_price": movie.ticket_price,
             }
             for movie in movies
         ]
