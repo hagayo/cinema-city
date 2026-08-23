@@ -1,0 +1,21 @@
+# Virtual environments
+.venv/
+.venv
+
+# temporary cache files for tests and code
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pylint.d/
+*.py[cod]
+*.py[oc]
+
+# distribution and deployment generated files
+build/
+dist/
+wheels/
+*.egg-info
+
+.coverage
+htmlcov/

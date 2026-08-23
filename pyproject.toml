@@ -1,0 +1,48 @@
+[project]
+name = "cinema-city"
+version = "0.1.0"
+description = "Cinema booking project with production-style structure"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+cinema-manager = "cinema.cli.manager_cli:main"
+cinema-customer = "cinema.cli.customer_cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.17.0",
+    "pylint>=3.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.12.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-v"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src", "tests"]
+strict = true
+
+[tool.pylint.main]
+py-version = "3.12"
+source-roots = ["src"]
+
+[tool.pylint.format]
+max-line-length = 100
+
+[tool.pylint.messages_control]
+disable = [
+    "too-few-public-methods",
+]
