@@ -6,6 +6,7 @@ from cinema.models.genre import Genre
 
 
 MAX_DESCRIPTION_LENGTH = 300
+MAX_DURATION_LENGTH = 240
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,7 +27,7 @@ class Movie:
         if not self.title.strip():
             raise ValueError("Movie title cannot be empty")
 
-        if self.duration_minutes <= 0:
+        if self.duration_minutes <= 0 or self.duration_minutes > MAX_DURATION_LENGTH:
             raise ValueError("Movie duration must be positive")
 
         if not self.description.strip():
