@@ -2,10 +2,10 @@
 
 from datetime import date, timedelta
 
+from cinema.cli.input_helpers import read_genre
 from cinema.models import Cinema, Genre, Hall, MovieShow
 from cinema.services import BookingService
 from cinema.storage import StorageService
-
 
 WEEK_DAYS = 7
 
@@ -33,21 +33,14 @@ def get_upcoming_shows_by_genre(
 ) -> tuple[MovieShow, ...]:
     """Return upcoming shows filtered by movie genre."""
     return tuple(
-        show
-        for show in get_upcoming_shows(cinema, start_date)
-        if show.movie.genre == genre
+        show for show in get_upcoming_shows(cinema, start_date) if show.movie.genre == genre
     )
 
 
 def find_show_by_id(cinema: Cinema, show_id: int) -> MovieShow | None:
     """Return a scheduled show by ID, or None when missing."""
     return next(
-        (
-            show
-            for hall in cinema.halls
-            for show in hall.schedule.shows
-            if show.show_id == show_id
-        ),
+        (show for hall in cinema.halls for show in hall.schedule.shows if show.show_id == show_id),
         None,
     )
 
@@ -58,11 +51,7 @@ def find_hall_by_number(
 ) -> Hall | None:
     """Return a cinema hall by number, or None when missing."""
     return next(
-        (
-            hall
-            for hall in cinema.halls
-            if hall.hall_number == hall_number
-        ),
+        (hall for hall in cinema.halls if hall.hall_number == hall_number),
         None,
     )
 
@@ -85,24 +74,6 @@ def read_positive_int(prompt: str) -> int:
         return number
 
 
-def read_genre() -> Genre:
-    """Read one supported movie genre from standard input."""
-    genres = list(Genre)
-
-    for index, genre in enumerate(genres, start=1):
-        print(f"{index}. {genre.value}")
-
-    while True:
-        choice = input("Choose genre: ").strip()
-
-        if choice.isdigit():
-            index = int(choice) - 1
-            if 0 <= index < len(genres):
-                return genres[index]
-
-        print("Invalid genre.")
-
-
 def read_requested_seats() -> tuple[tuple[int, int], ...]:
     """Read one to five adjacent seat coordinates."""
     seat_count = read_positive_int("How many seats? (1-5): ")
@@ -113,10 +84,7 @@ def read_requested_seats() -> tuple[tuple[int, int], ...]:
     row = read_positive_int("Row: ")
     first_seat = read_positive_int("First seat number: ")
 
-    return tuple(
-        (row, first_seat + offset)
-        for offset in range(seat_count)
-    )
+    return tuple((row, first_seat + offset) for offset in range(seat_count))
 
 
 def print_shows(shows: tuple[MovieShow, ...]) -> None:
@@ -153,10 +121,7 @@ def list_upcoming_shows_by_genre(cinema: Cinema) -> None:
     )
 
     if not shows:
-        print(
-            f"No {genre.value} shows are scheduled "
-            "for the coming week."
-        )
+        print(f"No {genre.value} shows are scheduled for the coming week.")
         return
 
     print_shows(shows)
@@ -196,10 +161,7 @@ def book_show_interactively(
         print(error)
         return next_booking_id
 
-    print(
-        f"Booking #{booking.booking_id} confirmed. "
-        f"Total: {booking.total_price} NIS"
-    )
+    print(f"Booking #{booking.booking_id} confirmed. Total: {booking.total_price} NIS")
     return next_booking_id + 1
 
 
@@ -208,19 +170,16 @@ def run_customer_cli() -> None:
     repository = StorageService()
     cinema, stored_bookings = repository.load()
     booking_service = BookingService(stored_bookings)
-    next_booking_id = max(
-        (booking.booking_id for booking in stored_bookings),
-        default=0,
-    ) + 1
+    next_booking_id = (
+        max(
+            (booking.booking_id for booking in stored_bookings),
+            default=0,
+        )
+        + 1
+    )
 
     while True:
-        print(
-            "\nCinema Customer\n"
-            "1. Shows this week\n"
-            "2. Search by genre\n"
-            "3. Book tickets\n"
-            "4. Exit"
-        )
+        print("\nCinema Customer\n1. Shows this week\n2. Search by genre\n3. Book tickets\n4. Exit")
 
         choice = input("Choose an option: ").strip()
 

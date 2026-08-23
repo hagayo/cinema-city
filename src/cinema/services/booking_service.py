@@ -7,7 +7,6 @@ from cinema.exceptions import (
 )
 from cinema.models import Booking, Hall, MovieShow, Seat
 
-
 MAX_SEATS_PER_BOOKING = 5
 
 
@@ -73,13 +72,10 @@ class BookingService:
             raise ValueError("At least one seat must be requested")
 
         if len(requested_seats) > MAX_SEATS_PER_BOOKING:
-            raise ValueError(
-                f"A booking can contain at most {MAX_SEATS_PER_BOOKING} seats"
-            )
+            raise ValueError(f"A booking can contain at most {MAX_SEATS_PER_BOOKING} seats")
 
         seats = tuple(
-            self.find_seat(hall, row, seat_number)
-            for row, seat_number in requested_seats
+            self.find_seat(hall, row, seat_number) for row, seat_number in requested_seats
         )
 
         if len(seats) != len(set(seats)):
@@ -91,8 +87,7 @@ class BookingService:
         for seat in seats:
             if self.is_seat_booked(show, seat):
                 raise SeatAlreadyBookedError(
-                    f"Seat {seat.row}-{seat.seat_number} is already booked "
-                    f"for show {show.show_id}"
+                    f"Seat {seat.row}-{seat.seat_number} is already booked for show {show.show_id}"
                 )
 
         booking = Booking(
@@ -127,7 +122,5 @@ class BookingService:
             return False
 
         seat_numbers = sorted(seat.seat_number for seat in seats)
-        expected_numbers = list(
-            range(seat_numbers[0], seat_numbers[0] + len(seat_numbers))
-        )
+        expected_numbers = list(range(seat_numbers[0], seat_numbers[0] + len(seat_numbers)))
         return seat_numbers == expected_numbers

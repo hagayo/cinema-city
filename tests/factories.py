@@ -10,7 +10,7 @@ def make_movie(
     title: str = "Back to the Future",
     duration_minutes: int = 120,
     genre: Genre = Genre.DRAMA,
-    ticket_price: int = 42,
+    ticket_price: int = 40,
 ) -> Movie:
     """Create a movie suitable for unit tests."""
     return Movie(
@@ -23,13 +23,14 @@ def make_movie(
     )
 
 
-def make_show(
+def make_show(  # pylint: disable=too-many-arguments
+    *,
     show_id: int = 1,
     hall_number: int = 1,
     hour: int = 18,
     minute: int = 0,
     duration_minutes: int = 120,
-    ticket_price: int = 42,
+    ticket_price: int = 40,
     genre: Genre = Genre.DRAMA,
 ) -> MovieShow:
     """Create a movie show suitable for unit tests."""

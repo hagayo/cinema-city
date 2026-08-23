@@ -6,7 +6,6 @@ from typing import Any
 
 from cinema.models import Cinema, Hall
 
-
 DEFAULT_CONFIG_FILE = Path("data/cinema_config.json")
 
 
@@ -51,11 +50,7 @@ class CinemaConfigRepository:
                 {
                     "hall_number": hall.hall_number,
                     "rows": max(seat.row for seat in hall.seats),
-                    "seats_per_row": max(
-                        seat.seat_number
-                        for seat in hall.seats
-                        if seat.row == 1
-                    ),
+                    "seats_per_row": max(seat.seat_number for seat in hall.seats if seat.row == 1),
                 }
                 for hall in cinema.halls
             ],

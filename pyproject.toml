@@ -49,6 +49,7 @@ source-roots = ["src"]
 max-line-length = 100
 
 [tool.pylint.messages_control]
-disable = [
-    "too-few-public-methods",
-]
+disable = ["too-few-public-methods", ]
+
+[tool.pylint.similarities]
+min-similarity-lines = 12

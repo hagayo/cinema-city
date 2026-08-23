@@ -6,7 +6,6 @@ from typing import Self
 from cinema.models.hall_schedule import HallSchedule
 from cinema.models.seat import Seat
 
-
 DEFAULT_ROWS = 20
 DEFAULT_SEATS_PER_ROW = 20
 

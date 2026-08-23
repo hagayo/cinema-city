@@ -51,7 +51,7 @@ def test_scheduled_shows_have_different_non_overlapping_times() -> None:
         assert len({show.start_time for show in shows}) == 3
         assert all(
             first.end_time <= second.start_time
-            for first, second in zip(shows, shows[1:])
+            for first, second in zip(shows, shows[1:], strict=False)
         )
 
 

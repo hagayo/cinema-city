@@ -6,7 +6,6 @@ from typing import Self
 from cinema.models.hall import Hall
 from cinema.models.movie import Movie
 
-
 DEFAULT_HALL_COUNT = 3
 
 
@@ -49,7 +48,6 @@ class Cinema:
             raise ValueError("Hall count must be positive")
 
         halls = tuple(
-            Hall.create_default(hall_number=hall_number)
-            for hall_number in range(1, hall_count + 1)
+            Hall.create_default(hall_number=hall_number) for hall_number in range(1, hall_count + 1)
         )
         return cls(name=name, halls=halls)

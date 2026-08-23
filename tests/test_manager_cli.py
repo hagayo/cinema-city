@@ -1,16 +1,27 @@
 """Unit tests for cinema manager CLI helper functions."""
 
+from datetime import date, datetime
 from unittest.mock import patch
+
+import pytest
 
 from cinema.cli.manager_cli import (
     find_movie_by_id_or_title,
     list_bookings,
     list_shows_by_hall,
-    read_ticket_price,
     read_non_empty_text,
     read_positive_int,
+    read_ticket_price,
 )
-from cinema.models import Genre, Movie
+from cinema.models import (
+    Booking,
+    Cinema,
+    Genre,
+    Movie,
+    MovieShow,
+    Seat,
+)
+from cinema.services import CinemaManager
 
 
 def test_read_positive_int_accepts_positive_number() -> None:
@@ -64,11 +75,10 @@ def test_read_ticket_price_retries_until_value_is_in_range() -> None:
         assert read_ticket_price() == 55
 
 
-def test_list_shows_by_hall_prints_only_selected_hall(capsys) -> None:
+def test_list_shows_by_hall_prints_only_selected_hall(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Manager can list shows for one selected hall."""
-    from datetime import date
-    from cinema.models import Cinema
-    from cinema.services import CinemaManager
 
     cinema = Cinema.create_default("Cinema City")
     manager = CinemaManager(cinema)
@@ -84,10 +94,10 @@ def test_list_shows_by_hall_prints_only_selected_hall(capsys) -> None:
     assert "Hall 1 Shows" not in output
 
 
-def test_list_bookings_prints_booking_details(capsys) -> None:
+def test_list_bookings_prints_booking_details(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     """Manager booking list includes booking and seat information."""
-    from datetime import datetime
-    from cinema.models import Booking, MovieShow, Seat
 
     movie = Movie(1, "Dune", 120, "Science fiction.", Genre.DRAMA, 40)
     show = MovieShow(1, movie, 2, datetime(2026, 8, 23, 18, 0), 40)

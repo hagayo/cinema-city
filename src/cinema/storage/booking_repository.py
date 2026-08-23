@@ -6,7 +6,6 @@ from typing import Any
 
 from cinema.models import Booking, Cinema, Seat
 
-
 DEFAULT_BOOKINGS_FILE = Path("data/bookings.json")
 
 
@@ -25,11 +24,7 @@ class BookingRepository:
         with self._file_path.open("r", encoding="utf-8") as file:
             data: list[dict[str, Any]] = json.load(file)
 
-        shows_by_id = {
-            show.show_id: show
-            for hall in cinema.halls
-            for show in hall.schedule.shows
-        }
+        shows_by_id = {show.show_id: show for hall in cinema.halls for show in hall.schedule.shows}
 
         return [
             Booking(

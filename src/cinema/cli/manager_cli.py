@@ -2,11 +2,11 @@
 
 from datetime import date
 
-from cinema.models import Booking, Cinema, Genre, Movie
+from cinema.cli.input_helpers import read_genre
+from cinema.models import Booking, Cinema, Movie
 from cinema.services import CinemaManager
-from cinema.storage import StorageService
-
 from cinema.services.cinema_manager import DEFAULT_TICKET_PRICE
+from cinema.storage import StorageService
 
 MAX_TICKET_PRICE = 99
 
@@ -27,7 +27,6 @@ def read_positive_int(prompt: str) -> int:
             continue
 
         return value
-
 
 
 def read_ticket_price(prompt: str = "Ticket price [40 NIS]: ") -> int:
@@ -61,25 +60,6 @@ def read_non_empty_text(prompt: str) -> str:
         print("Value cannot be empty.")
 
 
-def read_genre() -> Genre:
-    """Read one supported movie genre from standard input."""
-    genres = list(Genre)
-
-    print("Genres:")
-    for index, genre in enumerate(genres, start=1):
-        print(f"{index}. {genre.value}")
-
-    while True:
-        choice = input("Choose genre: ").strip()
-
-        if choice.isdigit():
-            index = int(choice) - 1
-            if 0 <= index < len(genres):
-                return genres[index]
-
-        print("Invalid genre.")
-
-
 def find_movie_by_id_or_title(
     movies: list[Movie],
     movie_reference: str,
@@ -96,11 +76,7 @@ def find_movie_by_id_or_title(
 
     normalized_title = normalized_reference.casefold()
     return next(
-        (
-            movie
-            for movie in movies
-            if movie.title.casefold() == normalized_title
-        ),
+        (movie for movie in movies if movie.title.casefold() == normalized_title),
         None,
     )
 
@@ -158,7 +134,6 @@ def list_movies(cinema: Cinema) -> None:
         )
 
 
-
 def list_shows_by_hall(cinema: Cinema) -> None:
     """Ask for a hall and print its scheduled shows ordered by start time."""
     hall_number = read_positive_int("Hall number: ")
@@ -194,10 +169,7 @@ def list_bookings(bookings: list[Booking]) -> None:
 
     print("\nBookings")
     for booking in sorted(bookings, key=lambda item: item.booking_id):
-        seats = ", ".join(
-            f"R{seat.row}-S{seat.seat_number}"
-            for seat in booking.seats
-        )
+        seats = ", ".join(f"R{seat.row}-S{seat.seat_number}" for seat in booking.seats)
         print(
             f"#{booking.booking_id} | {booking.show.movie.title} | "
             f"Show #{booking.show.show_id} | Hall {booking.show.hall_number} | "

@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from cinema.models.genre import Genre
 
-
 MAX_DESCRIPTION_LENGTH = 300
 MAX_DURATION_LENGTH = 240
 
@@ -25,7 +24,7 @@ class Movie:
         if self.movie_id <= 0:
             raise ValueError("Movie ID must be positive")
 
-        if not self.title.strip():
+        if not self.title.strip():  # self.title.length == 0
             raise ValueError("Movie title cannot be empty")
 
         if self.duration_minutes <= 0 or self.duration_minutes > MAX_DURATION_LENGTH:
@@ -35,10 +34,7 @@ class Movie:
             raise ValueError("Movie description cannot be empty")
 
         if len(self.description) > MAX_DESCRIPTION_LENGTH:
-            raise ValueError(
-                f"Movie description cannot exceed "
-                f"{MAX_DESCRIPTION_LENGTH} characters"
-            )
+            raise ValueError(f"Movie description cannot exceed {MAX_DESCRIPTION_LENGTH} characters")
 
         if not 1 <= self.ticket_price <= 99:
             raise ValueError("Ticket price must be between 1 and 99 NIS")

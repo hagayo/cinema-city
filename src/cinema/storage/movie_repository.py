@@ -6,7 +6,6 @@ from typing import Any
 
 from cinema.models import Genre, Movie
 
-
 DEFAULT_MOVIES_FILE = Path("data/movies.json")
 
 

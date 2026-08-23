@@ -3,10 +3,10 @@
 from datetime import date
 
 from cinema.cli.customer_cli import (
-    get_upcoming_shows_by_genre,
     find_hall_by_number,
     find_show_by_id,
     get_upcoming_shows,
+    get_upcoming_shows_by_genre,
 )
 from cinema.models import Cinema, Genre
 from cinema.services import CinemaManager

@@ -4,7 +4,7 @@ from datetime import date, datetime, time
 
 import pytest
 
-from cinema.models import Genre, Booking, Cinema, Hall, HallSchedule, Movie, MovieShow, Seat
+from cinema.models import Booking, Cinema, Genre, Hall, HallSchedule, Movie, MovieShow, Seat
 from tests.factories import make_movie, make_show
 
 

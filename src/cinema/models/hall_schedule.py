@@ -6,7 +6,6 @@ from datetime import date, datetime, time, timedelta
 from cinema.models.movie import Movie
 from cinema.models.movie_show import MovieShow
 
-
 DEFAULT_OPENING_TIME = time(hour=10)
 DEFAULT_CLOSING_TIME = time(hour=23, minute=59)
 

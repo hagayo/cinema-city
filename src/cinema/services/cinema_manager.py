@@ -5,9 +5,8 @@ from datetime import date
 from cinema.exceptions import NotEnoughScheduleSlotsError
 from cinema.models import Cinema, Genre, Hall, Movie, MovieShow
 
-
 DEFAULT_SHOWS_PER_HALL = 3
-DEFAULT_TICKET_PRICE = 42
+DEFAULT_TICKET_PRICE = 40
 
 
 class CinemaManager:
@@ -16,22 +15,21 @@ class CinemaManager:
     def __init__(self, cinema: Cinema) -> None:
         """Create a manager for one cinema."""
         self._cinema = cinema
-        self._halls_by_number: dict[int, Hall] = {
-            hall.hall_number: hall
-            for hall in cinema.halls
-        }
-        self._next_movie_id = max(
-            (movie.movie_id for movie in cinema.movies),
-            default=0,
-        ) + 1
-        self._next_show_id = max(
-            (
-                show.show_id
-                for hall in cinema.halls
-                for show in hall.schedule.shows
-            ),
-            default=0,
-        ) + 1
+        self._halls_by_number: dict[int, Hall] = {hall.hall_number: hall for hall in cinema.halls}
+        self._next_movie_id = (
+            max(
+                (movie.movie_id for movie in cinema.movies),
+                default=0,
+            )
+            + 1
+        )
+        self._next_show_id = (
+            max(
+                (show.show_id for hall in cinema.halls for show in hall.schedule.shows),
+                default=0,
+            )
+            + 1
+        )
 
     def add_movie(
         self,
@@ -86,8 +84,7 @@ class CinemaManager:
 
             if len(available_times) < shows_per_hall:
                 raise NotEnoughScheduleSlotsError(
-                    f"Hall {hall.hall_number} does not have "
-                    f"{shows_per_hall} available slots"
+                    f"Hall {hall.hall_number} does not have {shows_per_hall} available slots"
                 )
 
             for start_time in available_times:

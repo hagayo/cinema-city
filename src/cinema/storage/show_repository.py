@@ -7,7 +7,6 @@ from typing import Any
 
 from cinema.models import Cinema, Movie, MovieShow
 
-
 DEFAULT_SHOWS_FILE = Path("data/shows.json")
 
 
@@ -31,10 +30,7 @@ class ShowRepository:
             data: list[dict[str, Any]] = json.load(file)
 
         movies_by_id = {movie.movie_id: movie for movie in movies}
-        halls_by_number = {
-            hall.hall_number: hall
-            for hall in cinema.halls
-        }
+        halls_by_number = {hall.hall_number: hall for hall in cinema.halls}
 
         for item in data:
             hall_number = int(item["hall_number"])
@@ -46,9 +42,7 @@ class ShowRepository:
                     show_id=int(item["show_id"]),
                     movie=movie,
                     hall_number=hall_number,
-                    start_time=datetime.fromisoformat(
-                        str(item["start_time"])
-                    ),
+                    start_time=datetime.fromisoformat(str(item["start_time"])),
                     ticket_price=int(item["ticket_price"]),
                 )
             )
