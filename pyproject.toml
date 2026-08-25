@@ -1,10 +1,13 @@
 [project]
 name = "cinema-city"
-version = "0.1.0"
+version = "9.2.0"
 description = "Cinema booking project with production-style structure"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "filelock>=3.16,<4",
+    "platformdirs>=4,<5",
+]
 
 [project.scripts]
 cinema-manager = "cinema.cli.manager_cli:main"
@@ -15,6 +18,7 @@ dev = [
     "mypy>=1.17.0",
     "pylint>=3.3.0",
     "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
     "ruff>=0.12.0",
 ]
 
@@ -24,7 +28,7 @@ package = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-addopts = "-v"
+addopts = "-v --cov=cinema --cov-report=term-missing --cov-fail-under=90"
 
 [tool.ruff]
 line-length = 100

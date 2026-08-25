@@ -1,10 +1,30 @@
-[
-  {
-    "movie_id": 1,
-    "title": "Python-Adventures",
-    "duration_minutes": 96,
-    "description": "the long journey of a python developer to the light",
-    "genre": "comedy",
-    "ticket_price": 40
-  }
-]
+{
+  "schema_version": 5,
+  "last_movie_id": 0,
+  "movies": [
+	  {
+	    "movie_id": 1,
+	    "title": "Python-Adventures",
+	    "duration_minutes": 96,
+	    "description": "the long journey of a python developer to the light",
+	    "genre": "comedy",
+	    "ticket_price": 40
+	  },
+	  {
+	    "movie_id": 2,
+	    "title": "zoom out",
+	    "duration_minutes": 107,
+	    "description": "how to zoom out when you are stuck in the worst meeting ever!",
+	    "genre": "thriller",
+	    "ticket_price": 40
+	  },
+	  {
+	    "movie_id": 3,
+	    "title": "the class",
+	    "duration_minutes": 102,
+	    "description": "the story of a secret class in python",
+	    "genre": "crime",
+	    "ticket_price": 38
+	  }
+	]
+}

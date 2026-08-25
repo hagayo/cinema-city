@@ -1,37 +1,33 @@
-"""Movie-show domain model."""
+"""Movie-show database-oriented domain model."""
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime
 
-from cinema.models.movie import Movie
+from cinema.exceptions import ScheduleValidationError
+from cinema.models.movie import MAX_TICKET_PRICE, MIN_TICKET_PRICE
 
 
 @dataclass(frozen=True, slots=True)
 class MovieShow:
-    """Represent one screening of a movie in a specific hall and time."""
+    """Represent one movie-show row using foreign-key IDs only."""
 
     show_id: int
-    movie: Movie
-    hall_number: int
+    movie_id: int
+    hall_id: int
     start_time: datetime
     ticket_price: int
 
     def __post_init__(self) -> None:
-        """Validate movie-show values.
-
-        Raises:
-            ValueError: If an identifier is invalid or the ticket price is negative.
-        """
         if self.show_id <= 0:
-            raise ValueError("Show ID must be positive")
-
-        if self.hall_number <= 0:
-            raise ValueError("Hall number must be positive")
-
-        if self.ticket_price < 0:
-            raise ValueError("Ticket price cannot be negative")
-
-    @property
-    def end_time(self) -> datetime:
-        """Return the calculated end time of the movie show."""
-        return self.start_time + timedelta(minutes=self.movie.duration_minutes)
+            raise ScheduleValidationError("Show ID must be positive")
+        if self.movie_id <= 0:
+            raise ScheduleValidationError("Movie ID must be positive")
+        if self.hall_id <= 0:
+            raise ScheduleValidationError("Hall ID must be positive")
+        if self.start_time.tzinfo is None or self.start_time.utcoffset() is None:
+            raise ScheduleValidationError("Movie show start time must be timezone-aware")
+        if not MIN_TICKET_PRICE <= self.ticket_price <= MAX_TICKET_PRICE:
+            raise ScheduleValidationError(
+                f"Ticket price must be between {MIN_TICKET_PRICE} and "
+                f"{MAX_TICKET_PRICE} NIS"
+            )

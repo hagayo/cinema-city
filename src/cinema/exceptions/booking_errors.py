@@ -1,8 +1,14 @@
 """Exceptions related to cinema bookings."""
 
+from cinema.exceptions.base import BusinessError
 
-class BookingError(Exception):
+
+class BookingError(BusinessError):
     """Base exception for booking-related errors."""
+
+
+class BookingValidationError(BookingError):
+    """Raised when a requested booking violates a booking rule."""
 
 
 class SeatNotFoundError(BookingError):

@@ -1,126 +1,167 @@
-"""Business logic for creating and cancelling cinema bookings."""
+"""Stateless business logic for validating booking requests."""
+
+from datetime import datetime, timedelta
 
 from cinema.exceptions import (
-    BookingNotFoundError,
+    AuthorizationError,
+    BookingValidationError,
     SeatAlreadyBookedError,
     SeatNotFoundError,
 )
-from cinema.models import Booking, Hall, MovieShow, Seat
+from cinema.models import (
+    AuthContext,
+    Booking,
+    BookingRequest,
+    BookingSeat,
+    MovieShow,
+    Permission,
+    Seat,
+    User,
+)
+from cinema.time_utils import require_aware
 
 MAX_SEATS_PER_BOOKING = 5
+CANCELLATION_NOTICE = timedelta(hours=1)
 
 
 class BookingService:
-    """Manage cinema bookings."""
-
-    def __init__(
-        self,
-        bookings: list[Booking] | None = None,
-    ) -> None:
-        """Create a booking service with optional existing bookings."""
-        self._bookings = list(bookings) if bookings is not None else []
-
-    @property
-    def bookings(self) -> tuple[Booking, ...]:
-        """Return an immutable view of current bookings."""
-        return tuple(self._bookings)
+    """Validate booking operations using explicit entity collections."""
 
     @staticmethod
     def find_seat(
-        hall: Hall,
-        row: int,
+        seats: list[Seat] | tuple[Seat, ...],
+        hall_id: int,
+        row_number: int,
         seat_number: int,
     ) -> Seat:
-        """Return a physical seat from a hall.
-
-        Raises:
-            SeatNotFoundError: If the requested seat does not exist.
-        """
-        for seat in hall.seats:
-            if seat.row == row and seat.seat_number == seat_number:
-                return seat
-
-        raise SeatNotFoundError(
-            f"Seat {row}-{seat_number} does not exist in hall {hall.hall_number}"
+        """Return a physical seat by hall and coordinates."""
+        seat = next(
+            (
+                item
+                for item in seats
+                if item.hall_id == hall_id
+                and item.row_number == row_number
+                and item.seat_number == seat_number
+            ),
+            None,
         )
+        if seat is None:
+            raise SeatNotFoundError(
+                f"Seat {row_number}-{seat_number} does not exist in hall {hall_id}"
+            )
+        return seat
 
-    def is_seat_booked(self, show: MovieShow, seat: Seat) -> bool:
-        """Return whether a seat is booked for a specific show."""
-        return any(
-            booking.show.show_id == show.show_id and seat in booking.seats
-            for booking in self._bookings
-        )
-
-    def create_booking(
-        self,
-        booking_id: int,
-        hall: Hall,
+    @staticmethod
+    def prepare_booking(
+        *,
+        actor: AuthContext,
+        user: User,
         show: MovieShow,
         requested_seats: tuple[tuple[int, int], ...],
-    ) -> Booking:
-        """Create a booking after validating all requested seats.
-
-        Raises:
-            ValueError: If the show, amount, or seat adjacency is invalid.
-            SeatNotFoundError: If a requested seat does not exist.
-            SeatAlreadyBookedError: If a requested seat is already booked.
-        """
-        if show.hall_number != hall.hall_number:
-            raise ValueError("Show does not belong to the given hall")
-
+        seats: list[Seat] | tuple[Seat, ...],
+        bookings: list[Booking] | tuple[Booking, ...] = (),
+        booking_seats: list[BookingSeat] | tuple[BookingSeat, ...] = (),
+    ) -> BookingRequest:
+        """Authorize and validate a booking using the authenticated user mapping."""
+        actor.require(Permission.BOOK_TICKETS)
+        BookingService._require_own_user(actor, user)
         if not requested_seats:
-            raise ValueError("At least one seat must be requested")
-
+            raise BookingValidationError("At least one seat must be requested")
         if len(requested_seats) > MAX_SEATS_PER_BOOKING:
-            raise ValueError(f"A booking can contain at most {MAX_SEATS_PER_BOOKING} seats")
+            raise BookingValidationError(
+                f"A booking can contain at most {MAX_SEATS_PER_BOOKING} seats"
+            )
 
-        seats = tuple(
-            self.find_seat(hall, row, seat_number) for row, seat_number in requested_seats
+        selected = tuple(
+            BookingService.find_seat(
+                seats,
+                show.hall_id,
+                row_number,
+                seat_number,
+            )
+            for row_number, seat_number in requested_seats
+        )
+        seat_ids = tuple(seat.seat_id for seat in selected)
+        if len(seat_ids) != len(set(seat_ids)):
+            raise BookingValidationError("A seat cannot be requested more than once")
+        if not BookingService._are_seats_adjacent(selected):
+            raise BookingValidationError(
+                "Requested seats must be adjacent in the same row"
+            )
+
+        booking_by_id = {booking.booking_id: booking for booking in bookings}
+        occupied_ids = {
+            row.seat_id
+            for row in booking_seats
+            if (
+                row.booking_id in booking_by_id
+                and booking_by_id[row.booking_id].show_id == show.show_id
+            )
+        }
+        overlap = occupied_ids.intersection(seat_ids)
+        if overlap:
+            raise SeatAlreadyBookedError(
+                f"Seat ID {min(overlap)} is already booked for show {show.show_id}"
+            )
+
+        return BookingRequest(
+            user_id=user.user_id,
+            show_id=show.show_id,
+            seat_ids=seat_ids,
         )
 
-        if len(seats) != len(set(seats)):
-            raise ValueError("A seat cannot be requested more than once")
+    @staticmethod
+    def validate_cancellation(
+        actor: AuthContext,
+        user: User,
+        booking: Booking,
+        show: MovieShow,
+        current_time: datetime,
+    ) -> None:
+        """Authorize own-booking cancellation and validate its time window."""
+        actor.require(Permission.CANCEL_OWN_BOOKING)
+        BookingService._require_own_user(actor, user)
+        if booking.user_id != user.user_id:
+            raise AuthorizationError("Booking does not belong to authenticated user")
 
-        if not self._are_seats_adjacent(seats):
-            raise ValueError("Requested seats must be adjacent in the same row")
+        try:
+            require_aware(current_time)
+        except ValueError as error:
+            raise BookingValidationError(str(error)) from error
 
-        for seat in seats:
-            if self.is_seat_booked(show, seat):
-                raise SeatAlreadyBookedError(
-                    f"Seat {seat.row}-{seat.seat_number} is already booked for show {show.show_id}"
-                )
+        cancellation_deadline = show.start_time - CANCELLATION_NOTICE
+        if current_time > cancellation_deadline:
+            raise BookingValidationError(
+                "Booking can only be cancelled up to one hour before the show starts"
+            )
 
-        booking = Booking(
-            booking_id=booking_id,
-            show=show,
-            seats=seats,
+    @staticmethod
+    def total_price(
+        booking: Booking,
+        show: MovieShow,
+        booking_seats: list[BookingSeat] | tuple[BookingSeat, ...],
+    ) -> int:
+        """Calculate booking price from persisted show and junction rows."""
+        seat_count = sum(
+            1 for row in booking_seats if row.booking_id == booking.booking_id
         )
-        self._bookings.append(booking)
-        return booking
+        return show.ticket_price * seat_count
 
-    def cancel_booking(self, booking_id: int) -> None:
-        """Cancel an existing booking.
-
-        Raises:
-            BookingNotFoundError: If the booking does not exist.
-        """
-        for booking in self._bookings:
-            if booking.booking_id == booking_id:
-                self._bookings.remove(booking)
-                return
-
-        raise BookingNotFoundError(f"Booking {booking_id} does not exist")
+    @staticmethod
+    def _require_own_user(actor: AuthContext, user: User) -> None:
+        if actor.auth_subject != user.auth_subject:
+            raise AuthorizationError(
+                "Authenticated subject does not match the requested user"
+            )
 
     @staticmethod
     def _are_seats_adjacent(seats: tuple[Seat, ...]) -> bool:
-        """Return whether seats are consecutive and belong to one row."""
         if not seats:
             return False
-
-        row = seats[0].row
-        if any(seat.row != row for seat in seats):
+        row_number = seats[0].row_number
+        if any(seat.row_number != row_number for seat in seats):
             return False
 
         seat_numbers = sorted(seat.seat_number for seat in seats)
-        expected_numbers = list(range(seat_numbers[0], seat_numbers[0] + len(seat_numbers)))
-        return seat_numbers == expected_numbers
+        expected = list(range(seat_numbers[0], seat_numbers[0] + len(seat_numbers)))
+        return seat_numbers == expected

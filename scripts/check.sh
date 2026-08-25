@@ -26,7 +26,7 @@ run_check "pytest" uv run pytest
 run_check "ruff check" uv run ruff check .
 run_check "mypy" uv run mypy
 run_check "pylint" uv run pylint src tests
-run_check "ruff format" uv run ruff format .
+run_check "ruff format" uv run ruff format --check .
 
 echo
 echo "All checks passed successfully."
