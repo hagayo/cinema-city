@@ -85,6 +85,7 @@ version = "9.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "filelock" },
+    { name = "platformdirs" },
 ]
 
 [package.dev-dependencies]
@@ -97,7 +98,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "filelock", specifier = ">=3.32.4" }]
+requires-dist = [
+    { name = "filelock", specifier = ">=3.16,<4" },
+    { name = "platformdirs", specifier = ">=4,<5" },
+]
 
 [package.metadata.requires-dev]
 dev = [
