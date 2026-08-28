@@ -19,3 +19,12 @@ wheels/
 
 .coverage
 htmlcov/
+
+# local configuration and runtime data
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+runtime-data/
+runtime-logs/

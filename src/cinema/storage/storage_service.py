@@ -1,4 +1,4 @@
-"""Application storage facade coordinating injected repository abstractions."""
+"""Repository-coordinating read service using injected abstractions."""
 
 from cinema.models import (
     Booking,
@@ -20,7 +20,7 @@ from cinema.storage.interfaces import (
 
 
 class StorageService:
-    """Hide repository coordination behind one stable application storage facade."""
+    """Coordinate reads without constructing concrete persistence implementations."""
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class StorageService:
         movies = self.movie_repository.load()
         shows = self.show_repository.load(
             valid_hall_ids={hall.hall_id for hall in halls},
-            valid_movie_ids={movie.movie_id for movie in movies},
+            valid_movie_ids={movie.movie_id for movie in movies if movie.movie_id is not None},
         )
         return cinema, halls, seats, movies, shows
 
@@ -63,8 +63,8 @@ class StorageService:
         """Load bookings and junction rows against explicit valid foreign keys."""
         loaded_users = users if users is not None else self.user_repository.load()
         return self.booking_repository.load(
-            valid_show_ids={show.show_id for show in shows},
-            valid_user_ids={user.user_id for user in loaded_users},
+            valid_show_ids={show.show_id for show in shows if show.show_id is not None},
+            valid_user_ids={user.user_id for user in loaded_users if user.user_id is not None},
             valid_seat_ids={seat.seat_id for seat in seats},
         )
 

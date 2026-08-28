@@ -15,7 +15,7 @@ MAX_TICKET_PRICE = 99
 class Movie:
     """A movie that may be screened at different times and halls."""
 
-    movie_id: int
+    movie_id: int | None
     title: str
     duration_minutes: int
     description: str
@@ -24,7 +24,7 @@ class Movie:
 
     def __post_init__(self) -> None:
         """Validate movie data after object creation."""
-        if self.movie_id <= 0:
+        if self.movie_id is not None and self.movie_id <= 0:
             raise ValidationError("Movie ID must be positive")
 
         if not self.title.strip():

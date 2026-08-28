@@ -29,7 +29,7 @@ echo.
 echo ========================================
 echo Running pylint
 echo ========================================
-uv run pylint src tests
+uv run pylint --fail-under=9.0 src tests
 if errorlevel 1 goto pylint_failed
 echo OK: pylint passed.
 

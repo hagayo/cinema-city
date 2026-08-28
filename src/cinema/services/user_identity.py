@@ -40,8 +40,6 @@ def normalize_phone_number(phone_number: str) -> str:
         local_digits = digits
 
     if len(local_digits) != 10 or not local_digits.startswith("05"):
-        raise UserValidationError(
-            "Phone number must be a valid Israeli mobile number"
-        )
+        raise UserValidationError("Phone number must be a valid Israeli mobile number")
 
     return "+972" + local_digits[1:]

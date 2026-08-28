@@ -37,9 +37,7 @@ class JsonBookingRepository(BookingRepository):
                 last_booking_id, bookings_data, booking_seats_data = self._read_document()
 
             bookings = [self._deserialize_booking(item) for item in bookings_data]
-            booking_seats = [
-                self._deserialize_booking_seat(item) for item in booking_seats_data
-            ]
+            booking_seats = [self._deserialize_booking_seat(item) for item in booking_seats_data]
             self._validate(
                 bookings,
                 booking_seats,
@@ -59,31 +57,70 @@ class JsonBookingRepository(BookingRepository):
             ValueError,
             BusinessError,
         ) as error:
-            raise StorageError(
-                f"Could not load booking data from {self._file_path}"
-            ) from error
+            raise StorageError(f"Could not load booking data from {self._file_path}") from error
 
-    def add(self, request: BookingRequest) -> tuple[Booking, list[BookingSeat]]:
+    def find_by_id(self, booking_id: int) -> Booking | None:
+        """Return one booking without resolving its foreign keys."""
         try:
             with exclusive_file_lock(self._file_path):
-                last_booking_id, bookings_data, booking_seats_data = (
-                    self._read_document_for_write()
-                )
+                _, bookings_data, _ = self._read_document()
+            return next(
+                (
+                    booking
+                    for booking in map(self._deserialize_booking, bookings_data)
+                    if booking.booking_id == booking_id
+                ),
+                None,
+            )
+        except StorageError:
+            raise
+        except (
+            OSError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            BusinessError,
+        ) as error:
+            raise StorageError(f"Could not load booking data from {self._file_path}") from error
 
-                bookings = [
-                    self._deserialize_booking(item) for item in bookings_data
-                ]
+    def find_by_user_id(self, user_id: int) -> list[Booking]:
+        """Return all bookings owned by one local user."""
+        try:
+            with exclusive_file_lock(self._file_path):
+                _, bookings_data, _ = self._read_document()
+            return [
+                booking
+                for booking in map(self._deserialize_booking, bookings_data)
+                if booking.user_id == user_id
+            ]
+        except StorageError:
+            raise
+        except (
+            OSError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            BusinessError,
+        ) as error:
+            raise StorageError(f"Could not load booking data from {self._file_path}") from error
+
+    def add(self, request: BookingRequest) -> int:
+        try:
+            with exclusive_file_lock(self._file_path):
+                last_booking_id, bookings_data, booking_seats_data = self._read_document_for_write()
+
+                bookings = [self._deserialize_booking(item) for item in bookings_data]
                 booking_seats = [
-                    self._deserialize_booking_seat(item)
-                    for item in booking_seats_data
+                    self._deserialize_booking_seat(item) for item in booking_seats_data
                 ]
 
                 booked_ids = {
                     row.seat_id
                     for row in booking_seats
                     if any(
-                        booking.booking_id == row.booking_id
-                        and booking.show_id == request.show_id
+                        booking.booking_id == row.booking_id and booking.show_id == request.show_id
                         for booking in bookings
                     )
                 }
@@ -91,8 +128,7 @@ class JsonBookingRepository(BookingRepository):
                 if overlap:
                     seat_id = min(overlap)
                     raise SeatAlreadyBookedError(
-                        f"Seat ID {seat_id} is already booked "
-                        f"for show {request.show_id}"
+                        f"Seat ID {seat_id} is already booked for show {request.show_id}"
                     )
 
                 booking = Booking(
@@ -100,19 +136,18 @@ class JsonBookingRepository(BookingRepository):
                     user_id=request.user_id,
                     show_id=request.show_id,
                 )
+                assert booking.booking_id is not None
                 rows = [
                     BookingSeat(
                         booking_id=booking.booking_id,
-                        show_id=booking.show_id,
+                        show_id=request.show_id,
                         seat_id=seat_id,
                     )
                     for seat_id in request.seat_ids
                 ]
 
                 bookings_data.append(self._serialize_booking(booking))
-                booking_seats_data.extend(
-                    self._serialize_booking_seat(row) for row in rows
-                )
+                booking_seats_data.extend(self._serialize_booking_seat(row) for row in rows)
                 atomic_write_json(
                     self._file_path,
                     {
@@ -122,7 +157,7 @@ class JsonBookingRepository(BookingRepository):
                         "booking_seats": booking_seats_data,
                     },
                 )
-                return booking, rows
+                return booking.booking_id
         except (StorageError, SeatAlreadyBookedError):
             raise
         except (
@@ -133,23 +168,17 @@ class JsonBookingRepository(BookingRepository):
             ValueError,
             BusinessError,
         ) as error:
-            raise StorageError(
-                f"Could not add booking data to {self._file_path}"
-            ) from error
+            raise StorageError(f"Could not add booking data to {self._file_path}") from error
 
     def delete(
         self,
         booking_id: int,
         user_id: int,
-    ) -> tuple[Booking, list[BookingSeat]]:
+    ) -> int:
         try:
             with exclusive_file_lock(self._file_path):
-                last_booking_id, bookings_data, booking_seats_data = (
-                    self._read_document_for_write()
-                )
-                bookings = [
-                    self._deserialize_booking(item) for item in bookings_data
-                ]
+                last_booking_id, bookings_data, booking_seats_data = self._read_document_for_write()
+                bookings = [self._deserialize_booking(item) for item in bookings_data]
                 booking = next(
                     (item for item in bookings if item.booking_id == booking_id),
                     None,
@@ -157,9 +186,7 @@ class JsonBookingRepository(BookingRepository):
                 if booking is None:
                     raise BookingNotFoundError(f"Booking {booking_id} does not exist")
                 if booking.user_id != user_id:
-                    raise BookingValidationError(
-                        "Booking ID and phone number do not match"
-                    )
+                    raise BookingValidationError("Booking ID and phone number do not match")
 
                 removed_rows = [
                     self._deserialize_booking_seat(item)
@@ -167,14 +194,10 @@ class JsonBookingRepository(BookingRepository):
                     if int(item["booking_id"]) == booking_id
                 ]
                 remaining_bookings = [
-                    item
-                    for item in bookings_data
-                    if int(item["booking_id"]) != booking_id
+                    item for item in bookings_data if int(item["booking_id"]) != booking_id
                 ]
                 remaining_seats = [
-                    item
-                    for item in booking_seats_data
-                    if int(item["booking_id"]) != booking_id
+                    item for item in booking_seats_data if int(item["booking_id"]) != booking_id
                 ]
                 atomic_write_json(
                     self._file_path,
@@ -185,7 +208,7 @@ class JsonBookingRepository(BookingRepository):
                         "booking_seats": remaining_seats,
                     },
                 )
-                return booking, removed_rows
+                return len(removed_rows)
         except (StorageError, BookingNotFoundError, BookingValidationError):
             raise
         except (
@@ -196,9 +219,7 @@ class JsonBookingRepository(BookingRepository):
             ValueError,
             BusinessError,
         ) as error:
-            raise StorageError(
-                f"Could not delete booking data in {self._file_path}"
-            ) from error
+            raise StorageError(f"Could not delete booking data in {self._file_path}") from error
 
     def _read_document(
         self,
@@ -234,21 +255,17 @@ class JsonBookingRepository(BookingRepository):
         valid_user_ids: set[int],
         valid_seat_ids: set[int],
     ) -> None:
-        booking_ids = [booking.booking_id for booking in bookings]
+        if any(booking.booking_id is None for booking in bookings):
+            raise StorageError("Persisted booking is missing its ID")
+        booking_ids = [booking.booking_id for booking in bookings if booking.booking_id is not None]
         if len(booking_ids) != len(set(booking_ids)):
             raise StorageError("Booking data contains duplicate booking IDs")
         if last_booking_id < max(booking_ids, default=0):
-            raise StorageError(
-                "Booking data last_booking_id is lower than an existing booking ID"
-            )
+            raise StorageError("Booking data last_booking_id is lower than an existing booking ID")
 
         valid_booking_ids = set(booking_ids)
         seen_pairs: set[tuple[int, int]] = set()
         occupied_by_show: set[tuple[int, int]] = set()
-        shows_by_booking = {
-            booking.booking_id: booking.show_id for booking in bookings
-        }
-
         for booking in bookings:
             if booking.show_id not in valid_show_ids:
                 raise StorageError(
@@ -261,33 +278,31 @@ class JsonBookingRepository(BookingRepository):
 
         for row in booking_seats:
             if row.booking_id not in valid_booking_ids:
-                raise StorageError(
-                    f"Booking-seat references unknown booking {row.booking_id}"
-                )
-            if row.show_id != shows_by_booking[row.booking_id]:
-                raise StorageError(
-                    f"Booking-seat show {row.show_id} does not match "
-                    f"booking {row.booking_id}"
-                )
+                raise StorageError(f"Booking-seat references unknown booking {row.booking_id}")
             if row.seat_id not in valid_seat_ids:
-                raise StorageError(
-                    f"Booking-seat references unknown seat {row.seat_id}"
-                )
+                raise StorageError(f"Booking-seat references unknown seat {row.seat_id}")
             pair = (row.booking_id, row.seat_id)
             if pair in seen_pairs:
                 raise StorageError("Booking data contains duplicate booking-seat rows")
             seen_pairs.add(pair)
 
+            booking_show_id = next(
+                booking.show_id for booking in bookings if booking.booking_id == row.booking_id
+            )
+            if row.show_id != booking_show_id:
+                raise StorageError(f"Booking-seat show {row.show_id} does not match its booking")
+
             occupied = (row.show_id, row.seat_id)
             if occupied in occupied_by_show:
                 raise StorageError(
-                    f"Booking data double-books seat {row.seat_id} "
-                    f"for show {occupied[0]}"
+                    f"Booking data double-books seat {row.seat_id} for show {occupied[0]}"
                 )
             occupied_by_show.add(occupied)
 
     @staticmethod
     def _serialize_booking(booking: Booking) -> dict[str, int]:
+        if booking.booking_id is None:
+            raise StorageError("Cannot serialize a booking without an ID")
         return {
             "booking_id": booking.booking_id,
             "user_id": booking.user_id,

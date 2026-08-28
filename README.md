@@ -1,383 +1,251 @@
 # Cinema City
 
-Current version: **9.2.0**
+Current version: **9.7.2**
 
 Production-style Python teaching project for cinema scheduling, booking,
 repository abstractions, persistence, testing, and future Cloudflare D1 integration.
 
-## Setup
+הפרויקט כולל:
+
+- שני ממשקי CLI נפרדים ללקוחות ולמנהלים
+- ממשק Web רספונסיבי ב-HTML, CSS ו-JavaScript נקיים
+- FastAPI עם API ציבורי, API מוגן ללקוחות ו-API מוגן למנהלים
+- `NoAuthAuthenticationService` מפורש לפיתוח מקומי ללא אינטרנט
+- `ClerkAuthenticationService` עם אימות JWT בצד השרת ומיפוי ל-`user_id` פנימי
+- JSON מקומי עם `filelock`, כתיבה אטומית ונתיבי `platformdirs`
+- PostgreSQL/Neon עם Foreign Keys, Check Constraints והגנת DB מפני הזמנה כפולה
+- Composition Root יחיד לבחירת Authentication, Storage ו-Gateway
+- 109 בדיקות Unit, Integration ו-Repository Contract עם כיסוי של לפחות 90%
+
+## התחלה מהירה
+
+נדרשים Python 3.12 ו-[uv](https://docs.astral.sh/uv/).
 
 ```bash
-uv sync
+uv sync --frozen
+cp .env.local.example .env.local
+uv run cinema-web
 ```
 
-Run:
+פתחו:
+
+```text
+http://127.0.0.1:8000
+http://127.0.0.1:8000/manager
+```
+
+ב-Windows העתיקו את `.env.local.example` ידנית ל-`.env.local` או השתמשו ב-PowerShell:
+
+```powershell
+Copy-Item .env.local.example .env.local
+uv run cinema-web
+```
+
+מצב `NoAuth` הוא adapter מקומי אמיתי. תפקיד הלקוח או המנהל נקבע לפי קבוצת ה-routes בשרת ולא מתקבל מהדפדפן.
+
+## פקודות הפעלה
 
 ```bash
-uv run cinema-manager
+# CLI
 uv run cinema-customer
+uv run cinema-manager
+
+# Gateway משולב
+uv run cinema-web
+
+# שני Gateways נפרדים מאותו קוד
+uv run cinema-customer-web
+uv run cinema-manager-web
 ```
 
-Developer checks:
+ניתן לבחור גם באמצעות:
+
+```env
+API_MODE=combined
+# API_MODE=customer
+# API_MODE=manager
+```
+
+## מבנה הפרויקט
+
+```text
+src/cinema/
+├── application/       # תרחישי שימוש ו-DTO לקריאה
+├── auth/              # AuthContext, NoAuth ו-Clerk
+├── cli/               # מתאמי CLI
+├── config/            # Settings מרוכזים
+├── exceptions/        # שגיאות Domain/Application מפורשות
+├── models/            # ישויות עסקיות בלבד
+├── services/          # חוקי הזמנה, תזמון וניהול
+├── storage/           # Interfaces, JSON ו-Neon
+├── web/               # FastAPI ונכסי Vanilla Web
+├── composition.py     # Composition Root יחיד
+└── db_init.py         # אתחול DB מפורש לפריסה
+```
+
+כיוון התלות:
+
+```text
+Web / CLI
+    -> Application Services
+        -> Business Services
+            -> Repository Interfaces
+                <- JSON / Neon Adapters
+```
+
+הליבה אינה מייבאת FastAPI, Clerk, SQLAlchemy, JSON או HTML.
+
+## הזדהות והרשאות
+
+ה-Frontend שולח רק:
+
+```http
+Authorization: Bearer <Clerk session token>
+```
+
+השרת:
+
+1. מאמת חתימה, `exp`, `iat`, `nbf`, `iss` ו-`azp`.
+2. קורא מ-Clerk את כתובת הדוא"ל הראשית ואת מצב האימות שלה.
+3. ממפה `(auth_provider, auth_subject)` למשתמש המקומי.
+4. יוצר `AuthContext(user_id, role, permissions)` פנימי.
+5. בודק Authorization לפני קריאה לשירות העסקי.
+
+`Clerk user ID` אינו משמש כמפתח עסקי. הזמנות וקשרים נשמרים רק מול `user_id` פנימי.
+
+מנהלים מוגדרים כרגע באמצעות רשימת כתובות דוא"ל מאומתות:
+
+```env
+MANAGER_EMAILS=admin@example.com,manager@example.com
+```
+
+## Storage
+
+### JSON מקומי
+
+```env
+STORAGE_BACKEND=json
+CINEMA_DATA_DIR=./runtime-data
+```
+
+קבצי schema v3:
+
+```text
+cinema_config.json
+movies.json
+shows.json
+users.json
+bookings.json
+```
+
+פעולות read-modify-write מוגנות בנעילה, נכתבות לקובץ זמני, עוברות `fsync` ומוחלפות באמצעות `os.replace()`.
+
+### Neon
+
+```env
+STORAGE_BACKEND=neon
+NEON_DATABASE_URL=postgresql://...
+AUTO_CREATE_SCHEMA=false
+```
+
+לפני העלאת שרת חדש מריצים פעם אחת כחלק מתהליך ה-Release:
 
 ```bash
-uv run pytest
-uv run ruff check .
-uv run mypy
-uv run pylint src tests
-uv run ruff format --check .
+uv run cinema-db-init
 ```
 
-Windows:
+השרת עצמו אינו מקבל כברירת מחדל הרשאת DDL. במסד הנתונים נאכפים PK, FK, טווחים, זהות חיצונית ייחודית ו-`UNIQUE(show_id, seat_id)`.
 
-```bat
-scripts\check.bat
+### D1 ו-MongoDB
+
+ה-Settings וה-Composition Root מכירים את השמות `d1` ו-`mongodb`, אך adapters אלה אינם מוצגים כמוכנים לייצור ללא בדיקות אינטגרציה מול שירותים אמיתיים. הוספתם אינה דורשת שינוי ב-Business Logic - מממשים את אותם Repository Contracts ומריצים את בדיקות החוזה הקיימות.
+
+## Clerk בענן
+
+העתיקו את `.env.production.example` והשלימו את הערכים מתוך Clerk:
+
+```env
+APP_ENV=production
+AUTH_ENABLED=true
+AUTH_PROVIDER=clerk
+CLERK_PUBLISHABLE_KEY=pk_...
+CLERK_SECRET_KEY=sk_...
+CLERK_ISSUER=https://...
+CLERK_JWKS_URL=https://.../.well-known/jwks.json
+CLERK_FRONTEND_API_URL=https://...
+CLERK_AUTHORIZED_PARTIES=https://cinema.example.com
 ```
 
-Linux/macOS:
+ה-Secret Key נשמר בשרת או ב-Secret Manager בלבד. הוא אינו נכתב ב-HTML, ב-JavaScript, ב-Git או ב-GitHub Pages.
+
+## API עיקרי
+
+Public:
+
+```text
+GET  /api/health
+GET  /api/config
+GET  /api/movies
+GET  /api/shows
+GET  /api/shows/{show_id}/seats
+```
+
+Customer protected:
+
+```text
+POST   /api/customer/bookings
+GET    /api/customer/bookings
+DELETE /api/customer/bookings/{booking_id}
+```
+
+Manager protected:
+
+```text
+POST /api/manager/movies
+POST /api/manager/shows
+GET  /api/manager/bookings
+GET  /api/manager/report
+```
+
+במצב שאינו Production זמין OpenAPI ב-`/api/docs`.
+
+## בדיקות ואיכות
 
 ```bash
 bash scripts/check.sh
 ```
 
-## Current architecture
+או ב-Windows:
+
+```bat
+scripts\check.bat
+```
+
+הבדיקה המלאה מריצה לפי הסדר:
 
 ```text
-CLI
- ↓
-Services
- ↓
-Repository Protocols
- ↓
-Json*Repository
- ↓
-JSON files
+pytest + coverage >= 90%
+ruff check
+mypy strict
+pylint >= 9.0
+ruff format --check
 ```
 
-The business layer depends on repository interfaces, not on JSON persistence.
+בדיקות החוזה רצות מול JSON ומול SQLAlchemy/SQLite, המייצג את אותם adapters של PostgreSQL/Neon ללא תלות בשירות חיצוני ב-CI.
 
-Current repository abstractions:
-
-```text
-CinemaConfigRepository
-MovieRepository
-ShowRepository
-UserRepository
-BookingRepository
-```
-
-Current implementations:
-
-```text
-JsonCinemaConfigRepository
-JsonMovieRepository
-JsonShowRepository
-JsonUserRepository
-JsonBookingRepository
-```
-
-The future D1 implementation will implement the same repository contracts.
-
-
-## StorageService stays the application storage facade
-
-`StorageService` deliberately keeps its name. It is the central storage
-coordinator and composition point: it groups the injected repository
-implementations and coordinates reads that span several repositories.
-
-```text
-create_json_storage_service() / future create_d1_storage_service()
-                         ↓
-                   StorageService
-                         ↓
-                Repository Interfaces
-                         ↓
-          Json*Repository / D1*Repository
-                         ↓
-                     JSON / D1
-```
-
-Business services still depend on repository **interfaces**, never on concrete
-JSON or D1 classes. `StorageService` is therefore the clear place where students
-can see which persistence implementation is currently wired into the
-application, without renaming it when the backend changes.
-
-## Auth0 identity and authorization
-
-Authentication identity is separated from the editable user profile.
-
-`User.auth_subject` stores the stable external Auth0 `sub` value:
-
-```text
-User
-- user_id
-- auth_subject   # Auth0 sub
-- full_name
-- phone_number
-- email
-```
-
-`email` and `phone_number` are profile data. They are no longer used as proof of
-authentication.
-
-After JWT verification, the future Worker will create an `AuthContext` and pass
-it into business services:
-
-```text
-AuthContext
-- auth_subject
-- role
-- permissions
-```
-
-Roles:
-
-```text
-Customer
-Manager
-```
-
-Permissions are explicit business capabilities such as:
-
-```text
-book:tickets
-cancel:own-booking
-manage:movies
-manage:schedule
-view:bookings
-view:report
-```
-
-The role/permission relationship is validated, and services call
-`actor.require(...)` before protected operations.
-
-The current CLI has no Auth0 login yet, so it asks for a local demo
-`auth_subject` to simulate the value that the Worker will later obtain from the
-verified JWT.
-
-## Creation DTOs
-
-Persisted entities are separate from creation/update input:
-
-```text
-NewMovie
-NewUser
-UserProfileUpdate
-BookingRequest
-MovieShowDraft
-```
-
-For example, `NewMovie` has no `movie_id`; the repository allocates the ID and
-returns a persisted `Movie`.
-
-`UserProfileUpdate` intentionally does not contain `auth_subject`, so normal
-profile updates cannot replace the external authentication identity.
-
-## Repository contract tests
-
-Reusable repository behavior tests live in:
-
-```text
-tests/contracts/repository_contracts.py
-```
-
-The same contract classes are currently executed against the JSON
-implementations by:
-
-```text
-tests/contracts/test_json_repository_contracts.py
-```
-
-A future backend only needs an adapter that supplies its repositories:
-
-```text
-TestJsonMovieRepositoryContract
-TestD1MovieRepositoryContract
-TestNeonMovieRepositoryContract
-```
-
-The behavior tests themselves stay the same. This demonstrates that the
-application depends on repository contracts rather than a specific database.
-
-## Database-oriented entities
-
-Persisted dataclasses use IDs instead of nested object graphs.
-
-```text
-Cinema
-- cinema_id
-- name
-
-Hall
-- hall_id
-- hall_name
-
-Seat
-- seat_id
-- hall_id
-- row_number
-- seat_number
-
-Movie
-- movie_id
-- title
-- duration_minutes
-- description
-- genre
-- ticket_price
-
-MovieShow
-- show_id
-- movie_id
-- hall_id
-- start_time
-- ticket_price
-
-User
-- user_id
-- auth_subject
-- full_name
-- phone_number
-- email
-
-Booking
-- booking_id
-- user_id
-- show_id
-
-BookingSeat
-- booking_id
-- show_id
-- seat_id
-```
-
-`BookingSeat.show_id` is intentionally explicit. It allows the database to enforce:
-
-```text
-UNIQUE(show_id, seat_id)
-```
-
-so the same physical seat cannot be booked twice for the same show.
-
-A single booking can still contain several adjacent seats by storing several
-`booking_seats` rows with the same `booking_id`.
-
-## Scheduling
-
-`Hall` contains no scheduling state.
-
-Scheduling logic belongs to:
-
-```text
-SchedulingService
-```
-
-The service is stateless and reads current data through repository abstractions.
-
-## Current JSON persistence
-
-Current JSON documents use:
-
-```json
-"schema_version": 5
-```
-
-The JSON implementation remains intentionally available while D1 is introduced,
-so students can see that persistence implementations can be exchanged without
-rewriting the business layer.
-
-## Cloudflare D1 schema
-
-The initial D1 schema is defined in:
-
-```text
-d1/schema.sql
-```
-
-It creates:
-
-```text
-cinemas
-halls
-seats
-movies
-movie_shows
-users
-bookings
-booking_seats
-```
-
-The schema is defined before implementing any `D1Repository`.
-
-### Database integrity
-
-The D1 schema contains:
-
-- primary keys for every persisted entity
-- foreign keys between related tables
-- unique `hall_name`
-- unique physical seat coordinate:
-  `hall_id + row_number + seat_number`
-- case-insensitive unique movie titles
-- unique Auth0 identity key: `auth_subject`
-- unique user email and phone number as profile-data integrity rules
-- unique show start time per hall:
-  `hall_id + start_time`
-- critical double-booking protection:
-  `UNIQUE(show_id, seat_id)`
-- a database trigger that rejects a seat that belongs to a different hall than
-  the scheduled show
-- indexes for common joins and lookups
-
-Deleting a booking cascades only to its `booking_seats` rows. Users, shows,
-movies, halls, and seats remain protected by restrictive foreign keys.
-
-## Double-booking protection
-
-Application-level validation still exists in `BookingService`, but it is not the
-final line of defense.
-
-The database itself rejects:
-
-```text
-show_id = 25
-seat_id = 301
-```
-
-if that exact pair has already been persisted.
-
-This protects the system even when two requests race concurrently and both pass
-the application-level availability check before either request sees the other.
-
-## D1 schema tests
-
-`tests/unit/test_d1_schema.py` loads the exact `d1/schema.sql` into an in-memory
-SQLite database and verifies:
-
-- required tables exist
-- foreign keys reject orphan rows
-- duplicate `show_id + seat_id` is rejected
-- the same seat is allowed for different shows
-- `BookingSeat.show_id` must match `Booking.show_id`
-- a seat must belong to the hall of the show
-- booking deletion cascades to junction rows only
-- unique business keys are enforced
-- CHECK constraints are enforced
-- expected indexes exist
-
-These tests validate the schema independently from `BookingService` and from the
-future `D1Repository`.
-
-## Testing
-
-Pytest enforces at least:
-
-```text
-90% total coverage
-```
-
-Run:
+## Docker
 
 ```bash
-uv run pytest
+docker build -t cinema-city:10.0.0 .
+docker run --rm -p 8080:8080 --env-file .env.production cinema-city:10.0.0
 ```
+
+לפריסה מלאה והקשחת אבטחה ראו:
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security](docs/SECURITY.md)
+- [Deployment](docs/DEPLOYMENT.md)
+
+## החלטות הרחבה
+
+המערכת מוכנה להוספת ספק Auth נוסף או Storage נוסף באמצעות adapter חדש בלבד. תשלומים, מנויים, קופונים, Audit Log והתראות לא מומשו, אך המזהה הפנימי והגבולות הקיימים מאפשרים להוסיף אותם בלי לקשור את המוצר ל-Clerk או ל-Neon.

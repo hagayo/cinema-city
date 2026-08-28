@@ -3,21 +3,11 @@
 from datetime import datetime, timedelta
 
 from cinema.exceptions import (
-    AuthorizationError,
     BookingValidationError,
     SeatAlreadyBookedError,
     SeatNotFoundError,
 )
-from cinema.models import (
-    AuthContext,
-    Booking,
-    BookingRequest,
-    BookingSeat,
-    MovieShow,
-    Permission,
-    Seat,
-    User,
-)
+from cinema.models import Booking, BookingRequest, BookingSeat, MovieShow, Seat
 from cinema.time_utils import require_aware
 
 MAX_SEATS_PER_BOOKING = 5
@@ -54,17 +44,18 @@ class BookingService:
     @staticmethod
     def prepare_booking(
         *,
-        actor: AuthContext,
-        user: User,
         show: MovieShow,
         requested_seats: tuple[tuple[int, int], ...],
+        user_id: int,
         seats: list[Seat] | tuple[Seat, ...],
         bookings: list[Booking] | tuple[Booking, ...] = (),
         booking_seats: list[BookingSeat] | tuple[BookingSeat, ...] = (),
     ) -> BookingRequest:
-        """Authorize and validate a booking using the authenticated user mapping."""
-        actor.require(Permission.BOOK_TICKETS)
-        BookingService._require_own_user(actor, user)
+        """Validate a booking and return only foreign-key IDs for persistence."""
+        if user_id <= 0:
+            raise BookingValidationError("Booking user ID must be positive")
+        if show.show_id is None:
+            raise BookingValidationError("Show must be persisted before booking")
         if not requested_seats:
             raise BookingValidationError("At least one seat must be requested")
         if len(requested_seats) > MAX_SEATS_PER_BOOKING:
@@ -85,9 +76,7 @@ class BookingService:
         if len(seat_ids) != len(set(seat_ids)):
             raise BookingValidationError("A seat cannot be requested more than once")
         if not BookingService._are_seats_adjacent(selected):
-            raise BookingValidationError(
-                "Requested seats must be adjacent in the same row"
-            )
+            raise BookingValidationError("Requested seats must be adjacent in the same row")
 
         booking_by_id = {booking.booking_id: booking for booking in bookings}
         occupied_ids = {
@@ -105,25 +94,19 @@ class BookingService:
             )
 
         return BookingRequest(
-            user_id=user.user_id,
+            user_id=user_id,
             show_id=show.show_id,
             seat_ids=seat_ids,
         )
 
     @staticmethod
     def validate_cancellation(
-        actor: AuthContext,
-        user: User,
         booking: Booking,
         show: MovieShow,
         current_time: datetime,
     ) -> None:
-        """Authorize own-booking cancellation and validate its time window."""
-        actor.require(Permission.CANCEL_OWN_BOOKING)
-        BookingService._require_own_user(actor, user)
-        if booking.user_id != user.user_id:
-            raise AuthorizationError("Booking does not belong to authenticated user")
-
+        """Allow cancellation only until one hour before the show starts."""
+        del booking
         try:
             require_aware(current_time)
         except ValueError as error:
@@ -142,17 +125,8 @@ class BookingService:
         booking_seats: list[BookingSeat] | tuple[BookingSeat, ...],
     ) -> int:
         """Calculate booking price from persisted show and junction rows."""
-        seat_count = sum(
-            1 for row in booking_seats if row.booking_id == booking.booking_id
-        )
+        seat_count = sum(1 for row in booking_seats if row.booking_id == booking.booking_id)
         return show.ticket_price * seat_count
-
-    @staticmethod
-    def _require_own_user(actor: AuthContext, user: User) -> None:
-        if actor.auth_subject != user.auth_subject:
-            raise AuthorizationError(
-                "Authenticated subject does not match the requested user"
-            )
 
     @staticmethod
     def _are_seats_adjacent(seats: tuple[Seat, ...]) -> bool:

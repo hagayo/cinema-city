@@ -4,23 +4,15 @@ from datetime import timedelta
 
 from cinema.cli.error_handling import run_cli_safely
 from cinema.cli.input_helpers import read_genre
+from cinema.composition import create_container
+from cinema.config import load_settings
 from cinema.exceptions import BusinessError
-from cinema.models import (
-    AuthContext,
-    Booking,
-    BookingSeat,
-    Hall,
-    Movie,
-    MovieShow,
-    NewMovie,
-    Seat,
-    manager_auth_context,
-)
+from cinema.models import Booking, BookingSeat, Hall, Movie, MovieShow, Seat
 from cinema.services import CinemaManager, SchedulingService
-from cinema.storage import StorageService, create_json_storage_service
+from cinema.services.cinema_manager import DEFAULT_TICKET_PRICE
+from cinema.storage import StorageService
 from cinema.time_utils import local_now
 
-DEFAULT_TICKET_PRICE = 40
 MAX_TICKET_PRICE = 99
 
 
@@ -80,17 +72,14 @@ def find_movie_by_id_or_title(
     )
 
 
-def add_movie_interactively(manager: CinemaManager, actor: AuthContext) -> Movie:
+def add_movie_interactively(manager: CinemaManager) -> Movie:
     print("\nAdd a new movie")
     movie = manager.add_movie(
-        actor,
-        NewMovie(
-            title=read_non_empty_text("Movie title: "),
-            duration_minutes=read_positive_int("Duration in minutes: "),
-            description=read_non_empty_text("Short description: "),
-            genre=read_genre(),
-            ticket_price=read_ticket_price(),
-        ),
+        title=read_non_empty_text("Movie title: "),
+        duration_minutes=read_positive_int("Duration in minutes: "),
+        description=read_non_empty_text("Short description: "),
+        genre=read_genre(),
+        ticket_price=read_ticket_price(),
     )
     print(f'Added movie #{movie.movie_id}: "{movie.title}"')
     return movie
@@ -99,7 +88,6 @@ def add_movie_interactively(manager: CinemaManager, actor: AuthContext) -> Movie
 def schedule_movie_interactively(
     movies: list[Movie],
     manager: CinemaManager,
-    actor: AuthContext,
 ) -> tuple[MovieShow, ...]:
     if not movies:
         print("No movies in catalog.")
@@ -115,7 +103,6 @@ def schedule_movie_interactively(
 
     try:
         shows = manager.schedule_movie(
-            actor=actor,
             movie=movie,
             screening_date=local_now().date(),
         )
@@ -183,24 +170,21 @@ def list_bookings(
         return
 
     seats_by_id = {seat.seat_id: seat for seat in seats}
-    shows_by_id = {show.show_id: show for show in shows}
-    movies_by_id = {movie.movie_id: movie for movie in movies}
+    shows_by_id = {show.show_id: show for show in shows if show.show_id is not None}
+    movies_by_id = {movie.movie_id: movie for movie in movies if movie.movie_id is not None}
     halls_by_id = {hall.hall_id: hall for hall in halls}
     rows_by_booking: dict[int, list[BookingSeat]] = {}
     for row in booking_seats:
         rows_by_booking.setdefault(row.booking_id, []).append(row)
 
     print("\nBookings")
-    for booking in sorted(bookings, key=lambda item: item.booking_id):
+    for booking in sorted(bookings, key=lambda item: item.booking_id or 0):
         show = shows_by_id[booking.show_id]
         movie = movies_by_id[show.movie_id]
         hall = halls_by_id[show.hall_id]
-        booking_rows = rows_by_booking.get(booking.booking_id, [])
+        booking_rows = rows_by_booking.get(booking.booking_id or 0, [])
         selected = [seats_by_id[row.seat_id] for row in booking_rows]
-        seat_text = ", ".join(
-            f"R{seat.row_number}-S{seat.seat_number}"
-            for seat in selected
-        )
+        seat_text = ", ".join(f"R{seat.row_number}-S{seat.seat_number}" for seat in selected)
         total = show.ticket_price * len(selected)
         print(
             f"#{booking.booking_id} | {movie.title} | Show #{show.show_id} | "
@@ -229,8 +213,7 @@ def print_report(storage: StorageService) -> None:
 
 
 def run_manager_cli() -> None:
-    storage = create_json_storage_service()
-    actor = manager_auth_context("cli|manager")
+    storage = create_container(load_settings()).storage
     scheduler = SchedulingService(
         config_repository=storage.config_repository,
         movie_repository=storage.movie_repository,
@@ -256,12 +239,12 @@ def run_manager_cli() -> None:
 
         if choice == "1":
             try:
-                add_movie_interactively(manager, actor)
+                add_movie_interactively(manager)
             except BusinessError as error:
                 print(f"Cannot add movie: {error}")
         elif choice == "2":
             movies = storage.movie_repository.load()
-            schedule_movie_interactively(movies, manager, actor)
+            schedule_movie_interactively(movies, manager)
         elif choice == "3":
             list_movies(storage.movie_repository.load())
         elif choice == "4":

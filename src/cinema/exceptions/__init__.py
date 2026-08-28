@@ -1,6 +1,10 @@
 """Application-specific exceptions."""
 
-from cinema.exceptions.auth_errors import AuthorizationError
+from cinema.exceptions.auth_errors import (
+    AuthenticationError,
+    AuthorizationError,
+    ConfigurationError,
+)
 from cinema.exceptions.base import (
     BusinessError,
     CinemaError,
@@ -23,12 +27,14 @@ from cinema.exceptions.storage_errors import StorageError
 from cinema.exceptions.user_errors import UserIdentityConflictError, UserValidationError
 
 __all__ = [
-    "AuthorizationError",
     "BookingError",
     "BookingNotFoundError",
     "BookingValidationError",
     "BusinessError",
+    "AuthenticationError",
+    "AuthorizationError",
     "CinemaError",
+    "ConfigurationError",
     "MovieAlreadyExistsError",
     "NotEnoughScheduleSlotsError",
     "ScheduleError",

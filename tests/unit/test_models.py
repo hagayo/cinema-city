@@ -1,6 +1,8 @@
 """Unit tests for clean database-oriented entities."""
 
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any, cast
 
 import pytest
 
@@ -17,7 +19,14 @@ def test_database_entities_contain_only_scalar_ids_and_values() -> None:
     show = MovieShow(1, 1, 1, datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE), 40)
     booking = Booking(1, 1, 1)
     booking_seat = BookingSeat(1, 1, 1)
-    user = User(1, "auth0|dana", "Dana Cohen", "+972501234567", "dana@example.com")
+    user = User(
+        1,
+        "clerk",
+        "subject-1",
+        "Dana Cohen",
+        "+972501234567",
+        "dana@example.com",
+    )
 
     assert cinema.cinema_id == 1
     assert hall.hall_name == "Hall Alpha"
@@ -49,7 +58,10 @@ def test_database_entities_contain_only_scalar_ids_and_values() -> None:
         (lambda: Seat(1, 1, 1, 0), "Seat number"),
     ],
 )
-def test_core_entities_reject_invalid_values(factory, message: str) -> None:
+def test_core_entities_reject_invalid_values(
+    factory: Callable[[], object],
+    message: str,
+) -> None:
     with pytest.raises(ValidationError, match=message):
         factory()
 
@@ -73,7 +85,7 @@ def test_movie_show_rejects_invalid_values(kwargs: dict[str, int]) -> None:
     }
     values.update(kwargs)
     with pytest.raises(ScheduleValidationError):
-        MovieShow(**values)
+        MovieShow(**cast(Any, values))
 
 
 def test_movie_show_rejects_naive_datetime() -> None:
@@ -92,6 +104,6 @@ def test_movie_show_rejects_naive_datetime() -> None:
         lambda: BookingSeat(1, 1, 0),
     ],
 )
-def test_booking_entities_reject_invalid_ids(booking) -> None:
+def test_booking_entities_reject_invalid_ids(booking: Callable[[], object]) -> None:
     with pytest.raises(BookingValidationError):
         booking()

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from cinema.exceptions import BusinessError, StorageError
-from cinema.models import Genre, Movie, NewMovie
+from cinema.models import Genre, Movie
 from cinema.storage.app_paths import MOVIES_FILE, STATE_LOCK_FILE
 from cinema.storage.interfaces import MovieRepository
 from cinema.storage.json_file import (
@@ -53,8 +53,14 @@ class JsonMovieRepository(MovieRepository):
         ) as error:
             raise StorageError(f"Could not load movie data from {self._file_path}") from error
 
-    def create(self, new_movie: NewMovie) -> Movie:
-        """Persist a movie and allocate its ID."""
+    def find_by_id(self, movie_id: int) -> Movie | None:
+        """Return one movie by its internal ID."""
+        return next((movie for movie in self.load() if movie.movie_id == movie_id), None)
+
+    def create(self, movie: Movie) -> int:
+        """Persist a non-persisted movie and return its allocated ID."""
+        if movie.movie_id is not None:
+            raise StorageError("A new movie must not already have an ID")
         try:
             with exclusive_lock(self._state_lock_path):
                 with exclusive_file_lock(self._file_path):
@@ -62,33 +68,29 @@ class JsonMovieRepository(MovieRepository):
                     movies = [self._deserialize(item) for item in data]
                     self._validate_unique_movies(movies, last_movie_id)
 
-                    normalized_title = new_movie.title.strip().casefold()
-                    if any(
-                        movie.title.strip().casefold() == normalized_title
-                        for movie in movies
-                    ):
-                        raise StorageError(
-                            f'Movie title "{new_movie.title.strip()}" already exists'
-                        )
+                    normalized_title = movie.title.strip().casefold()
+                    if any(movie.title.strip().casefold() == normalized_title for movie in movies):
+                        raise StorageError(f'Movie title "{movie.title.strip()}" already exists')
 
-                    movie = Movie(
+                    persisted = Movie(
                         movie_id=last_movie_id + 1,
-                        title=new_movie.title,
-                        duration_minutes=new_movie.duration_minutes,
-                        description=new_movie.description,
-                        genre=new_movie.genre,
-                        ticket_price=new_movie.ticket_price,
+                        title=movie.title,
+                        duration_minutes=movie.duration_minutes,
+                        description=movie.description,
+                        genre=movie.genre,
+                        ticket_price=movie.ticket_price,
                     )
-                    data.append(self._serialize(movie))
+                    data.append(self._serialize(persisted))
                     atomic_write_json(
                         self._file_path,
                         {
                             "schema_version": SCHEMA_VERSION,
-                            "last_movie_id": movie.movie_id,
+                            "last_movie_id": persisted.movie_id,
                             "movies": data,
                         },
                     )
-                    return movie
+                    assert persisted.movie_id is not None
+                    return persisted.movie_id
         except StorageError:
             raise
         except (
@@ -99,9 +101,7 @@ class JsonMovieRepository(MovieRepository):
             ValueError,
             BusinessError,
         ) as error:
-            raise StorageError(
-                f"Could not create movie in {self._file_path}"
-            ) from error
+            raise StorageError(f"Could not create movie in {self._file_path}") from error
 
     def _read_document(self) -> tuple[int, list[dict[str, Any]]]:
         document = read_json(self._file_path)
@@ -121,7 +121,9 @@ class JsonMovieRepository(MovieRepository):
 
     @staticmethod
     def _validate_unique_movies(movies: list[Movie], last_movie_id: int) -> None:
-        movie_ids = [movie.movie_id for movie in movies]
+        if any(movie.movie_id is None for movie in movies):
+            raise StorageError("Persisted movie is missing its ID")
+        movie_ids = [movie.movie_id for movie in movies if movie.movie_id is not None]
         if len(movie_ids) != len(set(movie_ids)):
             raise StorageError("Movie data contains duplicate movie IDs")
         if last_movie_id < max(movie_ids, default=0):
@@ -133,6 +135,8 @@ class JsonMovieRepository(MovieRepository):
 
     @staticmethod
     def _serialize(movie: Movie) -> dict[str, Any]:
+        if movie.movie_id is None:
+            raise StorageError("Cannot serialize a movie without an ID")
         return {
             "movie_id": movie.movie_id,
             "title": movie.title,

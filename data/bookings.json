@@ -1,5 +1,5 @@
 {
-  "schema_version": 5,
+  "schema_version": 3,
   "last_booking_id": 0,
   "bookings": [],
   "booking_seats": []

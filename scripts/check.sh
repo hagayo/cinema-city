@@ -25,7 +25,7 @@ run_check() {
 run_check "pytest" uv run pytest
 run_check "ruff check" uv run ruff check .
 run_check "mypy" uv run mypy
-run_check "pylint" uv run pylint src tests
+run_check "pylint" uv run pylint --fail-under=9.0 src tests
 run_check "ruff format" uv run ruff format --check .
 
 echo

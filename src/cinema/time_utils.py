@@ -1,10 +1,9 @@
 """Timezone helpers for cinema-local time and UTC persistence."""
 
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 from zoneinfo import ZoneInfo
 
 CINEMA_TIMEZONE = ZoneInfo("Asia/Jerusalem")
-UTC = timezone.utc
 
 
 def local_now() -> datetime:

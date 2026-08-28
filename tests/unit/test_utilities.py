@@ -2,6 +2,7 @@
 
 from datetime import date, datetime, time
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -37,7 +38,10 @@ def test_schema_rejects_wrong_version_and_allows_unversioned() -> None:
         validate_schema_version({"schema_version": 999})
 
 
-def test_bootstrap_creates_current_schema_files(tmp_path: Path, monkeypatch) -> None:
+def test_bootstrap_creates_schema_three_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     data = tmp_path / "runtime"
     monkeypatch.setattr(app_paths, "DATA_DIR", data)
     monkeypatch.setattr(app_paths, "CONFIG_FILE", data / "cinema_config.json")
@@ -80,19 +84,18 @@ def test_movie_validation_branches(kwargs: dict[str, object]) -> None:
     }
     values.update(kwargs)
     with pytest.raises(ValidationError):
-        Movie(**values)
+        Movie(**cast(Any, values))
 
 
 @pytest.mark.parametrize(
     "args",
     [
-        (0, "auth0|dana", "Dana", "+972501234567", "dana@example.com"),
-        (1, " ", "Dana", "+972501234567", "dana@example.com"),
-        (1, "auth0|dana", " ", "+972501234567", "dana@example.com"),
-        (1, "auth0|dana", "Dana", "", "dana@example.com"),
-        (1, "auth0|dana", "Dana", "+972501234567", ""),
+        (0, "clerk", "subject", "Dana", "", "dana@example.com"),
+        (1, "", "subject", "Dana", "", "dana@example.com"),
+        (1, "clerk", "", "Dana", "", "dana@example.com"),
+        (1, "clerk", "subject", " ", "", "dana@example.com"),
     ],
 )
 def test_user_model_validation_branches(args: tuple[object, ...]) -> None:
     with pytest.raises(UserValidationError):
-        User(*args)
+        User(*cast(Any, args))

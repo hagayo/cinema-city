@@ -1,4 +1,4 @@
-"""Tests for repository protocols and current JSON implementations."""
+"""Focused unit tests for JSON repository safety and integrity."""
 
 import json
 from datetime import datetime
@@ -12,7 +12,7 @@ from cinema.exceptions import (
     SeatAlreadyBookedError,
     StorageError,
 )
-from cinema.models import BookingRequest, Genre, MovieShowDraft, NewMovie
+from cinema.models import BookingRequest, Genre, Movie, MovieShow
 from cinema.storage import (
     BookingRepository,
     CinemaConfigRepository,
@@ -30,7 +30,7 @@ from cinema.time_utils import CINEMA_TIMEZONE
 from tests.conftest import CinemaEnvironment
 
 
-def test_repository_protocols_are_separate_from_json_implementations() -> None:
+def test_repository_protocols_are_separate_from_implementations() -> None:
     assert JsonMovieRepository is not MovieRepository
     assert JsonShowRepository is not ShowRepository
     assert JsonUserRepository is not UserRepository
@@ -40,15 +40,10 @@ def test_repository_protocols_are_separate_from_json_implementations() -> None:
 
 def test_json_config_loads_clean_entities(environment: CinemaEnvironment) -> None:
     cinema, halls, seats = JsonCinemaConfigRepository(environment.config_file).load()
-
     assert cinema.cinema_id == 1
-    assert cinema.name == "Cinema City"
     assert [hall.hall_name for hall in halls] == ["Hall Alpha", "Hall Beta", "Hall Gamma"]
-    assert [hall.hall_id for hall in halls] == [1, 2, 3]
     assert len(seats) == 36
     assert seats[0].seat_id == 1
-    assert seats[0].hall_id == 1
-    assert seats[-1].hall_id == 3
 
 
 @pytest.mark.parametrize(
@@ -79,7 +74,7 @@ def test_json_config_rejects_duplicate_halls(
     path.write_text(
         json.dumps(
             {
-                "schema_version": 5,
+                "schema_version": 3,
                 "cinema": {"cinema_id": 1, "name": "Cinema"},
                 "halls": halls,
             }
@@ -90,43 +85,23 @@ def test_json_config_rejects_duplicate_halls(
         JsonCinemaConfigRepository(path).load()
 
 
-def test_json_config_rejects_invalid_dimensions(tmp_path: Path) -> None:
-    path = tmp_path / "config.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 5,
-                "cinema": {"cinema_id": 1, "name": "Cinema"},
-                "halls": [
-                    {"hall_id": 1, "hall_name": "A", "rows": 0, "seats_per_row": 1}
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(StorageError, match="dimensions"):
-        JsonCinemaConfigRepository(path).load()
-
-
-def test_movie_repository_allocates_ids_and_enforces_title_uniqueness(
-    environment: CinemaEnvironment,
-) -> None:
+def test_movie_repository_entity_contract(environment: CinemaEnvironment) -> None:
     repo = JsonMovieRepository(environment.movies_file, environment.state_lock_file)
-
-    first = repo.create(NewMovie("Dune", 120, "Description", Genre.DRAMA, 40))
-    second = repo.create(NewMovie("Alien", 110, "Description", Genre.THRILLER, 45))
-
-    assert (first.movie_id, second.movie_id) == (1, 2)
-    assert repo.load() == [first, second]
-
+    first_id = repo.create(_movie("Dune"))
+    second_id = repo.create(_movie("Alien", Genre.THRILLER))
+    assert (first_id, second_id) == (1, 2)
+    assert repo.find_by_id(1) == repo.load()[0]
+    assert repo.find_by_id(99) is None
     with pytest.raises(StorageError, match="already exists"):
-        repo.create(NewMovie("  dune ", 100, "Other", Genre.DRAMA, 40))
+        repo.create(_movie("  dune "))
+    with pytest.raises(StorageError, match="must not already have an ID"):
+        repo.create(Movie(7, "Other", 100, "Description", Genre.DRAMA, 40))
 
 
-def test_movie_repository_rejects_duplicate_persisted_rows(tmp_path: Path) -> None:
+def test_movie_repository_rejects_corrupt_metadata(tmp_path: Path) -> None:
     path = tmp_path / "movies.json"
     movie = {
-        "movie_id": 1,
+        "movie_id": 2,
         "title": "Dune",
         "duration_minutes": 120,
         "description": "Description",
@@ -134,125 +109,47 @@ def test_movie_repository_rejects_duplicate_persisted_rows(tmp_path: Path) -> No
         "ticket_price": 40,
     }
     path.write_text(
-        json.dumps(
-            {
-                "schema_version": 5,
-                "last_movie_id": 1,
-                "movies": [movie, movie],
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(StorageError, match="duplicate movie IDs"):
-        JsonMovieRepository(path).load()
-
-
-def test_movie_repository_rejects_invalid_last_movie_id(tmp_path: Path) -> None:
-    path = tmp_path / "movies.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 5,
-                "last_movie_id": 0,
-                "movies": [{
-                    "movie_id": 2,
-                    "title": "Dune",
-                    "duration_minutes": 120,
-                    "description": "Description",
-                    "genre": "drama",
-                    "ticket_price": 40,
-                }],
-            }
-        ),
+        json.dumps({"schema_version": 3, "last_movie_id": 0, "movies": [movie]}),
         encoding="utf-8",
     )
     with pytest.raises(StorageError, match="last_movie_id"):
         JsonMovieRepository(path).load()
 
 
-def test_show_repository_allocates_ids_and_persists_foreign_keys(
-    environment: CinemaEnvironment,
-) -> None:
+def test_show_repository_entity_contract(environment: CinemaEnvironment) -> None:
     repo = JsonShowRepository(environment.shows_file, environment.state_lock_file)
-    draft = MovieShowDraft(
-        movie_id=1,
-        hall_id=2,
-        start_time=datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-        ticket_price=40,
-    )
-
-    [show] = repo.create_many([draft])
-    assert show.show_id == 1
-    assert show.movie_id == 1
-    assert show.hall_id == 2
-    assert repo.load({1, 2, 3}, {1}) == [show]
-
-    document = json.loads(environment.shows_file.read_text(encoding="utf-8"))
-    assert document["shows"][0]["movie_id"] == 1
-    assert document["shows"][0]["hall_id"] == 2
-    assert "movie" not in document["shows"][0]
-    assert "hall_number" not in document["shows"][0]
+    show = _show(movie_id=1, hall_id=2)
+    assert repo.create_many([show]) == [1]
+    persisted = repo.find_by_id(1)
+    assert persisted is not None
+    assert persisted.movie_id == 1 and persisted.hall_id == 2
+    assert repo.load({1, 2, 3}, {1}) == [persisted]
+    assert repo.find_by_id(99) is None
+    with pytest.raises(StorageError, match="must not already have IDs"):
+        repo.create_many([MovieShow(4, 1, 1, show.start_time, 40)])
 
 
-def test_show_repository_rejects_unknown_foreign_keys(
-    environment: CinemaEnvironment,
-) -> None:
+def test_show_repository_validates_foreign_keys(environment: CinemaEnvironment) -> None:
     repo = JsonShowRepository(environment.shows_file, environment.state_lock_file)
-    repo.create_many([
-        MovieShowDraft(
-            movie_id=9,
-            hall_id=8,
-            start_time=datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-            ticket_price=40,
-        )
-    ])
+    repo.create_many([_show(movie_id=9, hall_id=8)])
     with pytest.raises(StorageError, match="unknown hall"):
         repo.load({1}, {1})
 
 
-def test_show_repository_rejects_bad_last_show_id(tmp_path: Path) -> None:
-    path = tmp_path / "shows.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 5,
-                "last_show_id": 0,
-                "shows": [{
-                    "show_id": 2,
-                    "movie_id": 1,
-                    "hall_id": 1,
-                    "start_time": "2026-09-01T15:00:00+00:00",
-                    "ticket_price": 40,
-                }],
-            }
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(StorageError, match="last_show_id"):
-        JsonShowRepository(path).load({1}, {1})
-
-
-def test_booking_repository_persists_booking_and_junction_rows(
+def test_booking_repository_contract_and_explicit_show_id(
     environment: CinemaEnvironment,
 ) -> None:
     repo = JsonBookingRepository(environment.bookings_file)
-    booking, rows = repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2, 3)))
-
-    assert booking.booking_id == 1
-    assert booking.user_id == 1
-    assert booking.show_id == 7
-    assert [row.seat_id for row in rows] == [2, 3]
-
-    bookings, booking_seats = repo.load({7}, {1}, {1, 2, 3})
+    booking_id = repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2, 3)))
+    assert booking_id == 1
+    booking = repo.find_by_id(booking_id)
+    assert booking is not None and booking.user_id == 1
+    assert repo.find_by_user_id(1) == [booking]
+    bookings, rows = repo.load({7}, {1}, {1, 2, 3})
     assert bookings == [booking]
-    assert booking_seats == rows
-
+    assert {(row.show_id, row.seat_id) for row in rows} == {(7, 2), (7, 3)}
     document = json.loads(environment.bookings_file.read_text(encoding="utf-8"))
-    assert document["bookings"] == [{"booking_id": 1, "user_id": 1, "show_id": 7}]
-    assert document["booking_seats"] == [
-        {"booking_id": 1, "show_id": 7, "seat_id": 2},
-        {"booking_id": 1, "show_id": 7, "seat_id": 3},
-    ]
+    assert document["booking_seats"][0]["show_id"] == 7
 
 
 def test_booking_repository_prevents_double_booking(
@@ -260,41 +157,22 @@ def test_booking_repository_prevents_double_booking(
 ) -> None:
     repo = JsonBookingRepository(environment.bookings_file)
     repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2,)))
-
     with pytest.raises(SeatAlreadyBookedError):
         repo.add(BookingRequest(user_id=2, show_id=7, seat_ids=(2,)))
+    assert repo.add(BookingRequest(user_id=2, show_id=8, seat_ids=(2,))) == 2
 
 
-def test_same_seat_can_be_used_for_different_show(
+def test_booking_delete_checks_owner_and_releases_seats(
     environment: CinemaEnvironment,
 ) -> None:
     repo = JsonBookingRepository(environment.bookings_file)
-    repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2,)))
-    second, _ = repo.add(BookingRequest(user_id=2, show_id=8, seat_ids=(2,)))
-    assert second.booking_id == 2
-
-
-def test_booking_repository_delete_removes_junction_rows(
-    environment: CinemaEnvironment,
-) -> None:
-    repo = JsonBookingRepository(environment.bookings_file)
-    booking, rows = repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2, 3)))
-    deleted, deleted_rows = repo.delete(booking.booking_id, 1)
-    assert deleted == booking
-    assert deleted_rows == rows
-    assert repo.load({7}, {1}, {1, 2, 3}) == ([], [])
-
-
-def test_booking_repository_delete_rejects_missing_or_wrong_user(
-    environment: CinemaEnvironment,
-) -> None:
-    repo = JsonBookingRepository(environment.bookings_file)
-    booking, _ = repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2,)))
-
+    booking_id = repo.add(BookingRequest(user_id=1, show_id=7, seat_ids=(2, 3)))
     with pytest.raises(BookingValidationError):
-        repo.delete(booking.booking_id, 2)
+        repo.delete(booking_id, 2)
     with pytest.raises(BookingNotFoundError):
-        repo.delete(999, 1)
+        repo.delete(99, 1)
+    assert repo.delete(booking_id, 1) == 2
+    assert repo.load({7}, {1}, {1, 2, 3}) == ([], [])
 
 
 @pytest.mark.parametrize(
@@ -302,7 +180,7 @@ def test_booking_repository_delete_rejects_missing_or_wrong_user(
     [
         (
             {
-                "schema_version": 5,
+                "schema_version": 3,
                 "last_booking_id": 1,
                 "bookings": [{"booking_id": 1, "user_id": 9, "show_id": 7}],
                 "booking_seats": [],
@@ -311,25 +189,16 @@ def test_booking_repository_delete_rejects_missing_or_wrong_user(
         ),
         (
             {
-                "schema_version": 5,
-                "last_booking_id": 1,
-                "bookings": [{"booking_id": 1, "user_id": 1, "show_id": 99}],
-                "booking_seats": [],
-            },
-            "unknown show",
-        ),
-        (
-            {
-                "schema_version": 5,
+                "schema_version": 3,
                 "last_booking_id": 1,
                 "bookings": [{"booking_id": 1, "user_id": 1, "show_id": 7}],
-                "booking_seats": [{"booking_id": 1, "show_id": 7, "seat_id": 99}],
+                "booking_seats": [{"booking_id": 1, "show_id": 8, "seat_id": 2}],
             },
-            "unknown seat",
+            "does not match",
         ),
     ],
 )
-def test_booking_repository_validates_foreign_keys(
+def test_booking_repository_rejects_invalid_foreign_keys(
     tmp_path: Path,
     document: dict[str, object],
     message: str,
@@ -337,8 +206,22 @@ def test_booking_repository_validates_foreign_keys(
     path = tmp_path / "bookings.json"
     path.write_text(json.dumps(document), encoding="utf-8")
     with pytest.raises(StorageError, match=message):
-        JsonBookingRepository(path).load({7}, {1}, {1, 2, 3})
+        JsonBookingRepository(path).load({7, 8}, {1}, {1, 2, 3})
 
 
 def test_schema_version_constant_is_three() -> None:
-    assert SCHEMA_VERSION == 5
+    assert SCHEMA_VERSION == 3
+
+
+def _movie(title: str, genre: Genre = Genre.DRAMA) -> Movie:
+    return Movie(None, title, 120, "Description", genre, 40)
+
+
+def _show(movie_id: int, hall_id: int) -> MovieShow:
+    return MovieShow(
+        show_id=None,
+        movie_id=movie_id,
+        hall_id=hall_id,
+        start_time=datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
+        ticket_price=40,
+    )

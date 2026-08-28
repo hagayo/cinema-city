@@ -49,7 +49,7 @@ def environment(tmp_path: Path) -> CinemaEnvironment:
     env.config_file.write_text(
         json.dumps(
             {
-                "schema_version": 5,
+                "schema_version": 3,
                 "cinema": {"cinema_id": 1, "name": "Cinema City"},
                 "halls": [
                     {
@@ -76,17 +76,17 @@ def environment(tmp_path: Path) -> CinemaEnvironment:
         encoding="utf-8",
     )
     env.movies_file.write_text(
-        json.dumps({"schema_version": 5, "last_movie_id": 0, "movies": []}),
+        json.dumps({"schema_version": 3, "last_movie_id": 0, "movies": []}),
         encoding="utf-8",
     )
     env.shows_file.write_text(
-        json.dumps({"schema_version": 5, "last_show_id": 0, "shows": []}),
+        json.dumps({"schema_version": 3, "last_show_id": 0, "shows": []}),
         encoding="utf-8",
     )
     env.bookings_file.write_text(
         json.dumps(
             {
-                "schema_version": 5,
+                "schema_version": 3,
                 "last_booking_id": 0,
                 "bookings": [],
                 "booking_seats": [],
@@ -95,7 +95,7 @@ def environment(tmp_path: Path) -> CinemaEnvironment:
         encoding="utf-8",
     )
     env.users_file.write_text(
-        json.dumps({"schema_version": 5, "last_user_id": 0, "users": []}),
+        json.dumps({"schema_version": 3, "last_user_id": 0, "users": []}),
         encoding="utf-8",
     )
     return env

@@ -1,331 +1,213 @@
-"""Coverage and behavior tests for customer and manager CLI layers."""
+"""Boundary tests for shared CLI behavior and interactive use cases."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from cinema.cli import customer_cli, manager_cli
-from cinema.exceptions import BookingValidationError, MovieAlreadyExistsError
-from cinema.models import (
-    Booking,
-    BookingRequest,
-    BookingSeat,
-    Genre,
-    Hall,
-    Movie,
-    MovieShow,
-    MovieShowDraft,
-    NewMovie,
-    NewUser,
-    Seat,
-    User,
-    customer_auth_context,
-    manager_auth_context,
+from cinema.cli.error_handling import run_cli_safely
+from cinema.exceptions import StorageError
+from cinema.models import Genre
+from cinema.services import (
+    BookingService,
+    CinemaManager,
+    LocalUserService,
+    SchedulingService,
 )
+from cinema.storage import StorageService
 from cinema.time_utils import CINEMA_TIMEZONE
 from tests.conftest import CinemaEnvironment
 
 
-def sample_state():
-    halls = [Hall(1, "Hall Alpha"), Hall(2, "Hall Beta")]
-    seats = [
-        Seat(1, 1, 1, 1),
-        Seat(2, 1, 1, 2),
-        Seat(3, 2, 1, 1),
-        Seat(4, 2, 1, 2),
-    ]
-    movies = [
-        Movie(1, "Dune", 120, "Description", Genre.DRAMA, 40),
-        Movie(2, "Alien", 90, "Description", Genre.THRILLER, 45),
-    ]
-    now = datetime(2026, 9, 1, 12, tzinfo=CINEMA_TIMEZONE)
-    shows = [
-        MovieShow(1, 1, 1, now + timedelta(hours=2), 40),
-        MovieShow(2, 2, 2, now + timedelta(days=1), 45),
-        MovieShow(3, 1, 1, now - timedelta(hours=1), 40),
-    ]
-    return halls, seats, movies, shows, now
+def test_customer_show_filters_and_prints(
+    environment: CinemaEnvironment,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    storage = environment.storage()
+    manager, scheduler = _manager(storage)
+    movie = manager.add_movie("Dune", 120, "Description", Genre.DRAMA, 40)
+    shows = scheduler.schedule_movie(1, movie, date(2026, 9, 1), 1)
+    _, halls, _, movies, _ = storage.load_catalog()
+    now = datetime(2026, 9, 1, 10, tzinfo=CINEMA_TIMEZONE)
+    assert customer_cli.list_upcoming_shows(shows, movies, halls, now) == tuple(shows)
+    assert customer_cli.get_upcoming_shows_by_genre(shows, movies, now, Genre.DRAMA)
+    assert "Dune" in capsys.readouterr().out
 
 
-def test_customer_show_helpers(capsys) -> None:
-    halls, _, movies, shows, now = sample_state()
-    upcoming = customer_cli.get_upcoming_shows(shows, now)
-    assert [show.show_id for show in upcoming] == [1, 2]
-
-    drama = customer_cli.get_upcoming_shows_by_genre(
-        shows, movies, now, Genre.DRAMA
-    )
-    assert [show.show_id for show in drama] == [1]
-    assert customer_cli.find_show_by_id(upcoming, 2) == shows[1]
-    assert customer_cli.find_show_by_id(upcoming, 99) is None
-    assert customer_cli.find_hall_by_id(halls, 2) == halls[1]
-    assert customer_cli.find_hall_by_id(halls, 99) is None
-
-    customer_cli.print_shows(upcoming, movies, halls)
-    out = capsys.readouterr().out
-    assert "Dune" in out
-    assert "Hall Alpha" in out
-
-
-def test_customer_list_empty_and_genre_empty(monkeypatch, capsys) -> None:
-    halls, _, movies, _, now = sample_state()
-    assert customer_cli.list_upcoming_shows([], movies, halls, now) == ()
-    assert "No shows" in capsys.readouterr().out
-
-    monkeypatch.setattr(customer_cli, "read_genre", lambda: Genre.FAMILY)
-    customer_cli.list_upcoming_shows_by_genre([], movies, halls, now)
-    assert "No family shows" in capsys.readouterr().out
-
-
-def test_customer_input_helpers_retry(monkeypatch, capsys) -> None:
-    values = iter(["x", "0", "2"])
+def test_cli_input_validation_retries(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    values = iter(["bad", "0", "2"])
     monkeypatch.setattr("builtins.input", lambda _: next(values))
-    assert customer_cli.read_positive_int("X") == 2
+    assert customer_cli.read_positive_int("Number: ") == 2
+    prices = iter(["bad", "120", ""])
+    monkeypatch.setattr("builtins.input", lambda _: next(prices))
+    assert manager_cli.read_ticket_price() == 40
     assert "whole number" in capsys.readouterr().out
 
-    values = iter(["6", "2", "1", "3"])
-    monkeypatch.setattr("builtins.input", lambda _: next(values))
-    assert customer_cli.read_requested_seats() == ((1, 3), (1, 4))
 
-
-def test_customer_booking_success(environment: CinemaEnvironment, monkeypatch, capsys) -> None:
+def test_manager_helpers_add_find_and_schedule(
+    environment: CinemaEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     storage = environment.storage()
-    movie = storage.movie_repository.create(
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40)
-    )
-    show = storage.show_repository.create_many([
-        MovieShowDraft(
-            movie.movie_id,
-            1,
-            datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-            40,
-        )
-    ])[0]
-    _, halls, seats, movies, shows = storage.load_catalog()
-
-    answers = iter(["1", "Dana Cohen", "0501234567", "dana@example.com", "2", "1", "1"])
+    manager, _ = _manager(storage)
+    answers = iter(["Dune", "120", "Description", "2", ""])
     monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    movie = manager_cli.add_movie_interactively(manager)
+    assert manager_cli.find_movie_by_id_or_title([movie], "dune") == movie
+    monkeypatch.setattr("builtins.input", lambda _: str(movie.movie_id))
+    assert manager_cli.schedule_movie_interactively([movie], manager)
 
+
+def test_customer_booking_and_cancellation_flow(
+    environment: CinemaEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    storage = environment.storage()
+    manager, scheduler = _manager(storage)
+    movie = manager.add_movie("Dune", 120, "Description", Genre.DRAMA, 40)
+    show = scheduler.schedule_movie(1, movie, date(2026, 9, 1), 1)[0]
+    _, halls, seats, movies, shows = storage.load_catalog()
+    now = show.start_time - timedelta(hours=2)
+    answers = iter(
+        [str(show.show_id), "Dana Cohen", "0501234567", "dana@example.com", "2", "1", "1"]
+    )
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
     customer_cli.book_show_interactively(
-        actor=customer_auth_context("auth0|dana"),
         halls=halls,
         seats=seats,
         movies=movies,
         shows=shows,
         booking_repository=storage.booking_repository,
         user_repository=storage.user_repository,
-        current_time=datetime(2026, 9, 1, 12, tzinfo=CINEMA_TIMEZONE),
+        current_time=now,
     )
     assert "confirmed" in capsys.readouterr().out
-    users = storage.user_repository.load()
-    bookings, rows = storage.load_bookings(shows, seats, users)
-    assert len(bookings) == 1
-    assert len(rows) == 2
-
-
-def test_customer_booking_unavailable_show(
-    environment: CinemaEnvironment, monkeypatch, capsys
-) -> None:
-    storage = environment.storage()
-    movie = storage.movie_repository.create(
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40)
-    )
-    show = storage.show_repository.create_many([
-        MovieShowDraft(
-            movie.movie_id,
-            1,
-            datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-            40,
-        )
-    ])[0]
-    _, halls, seats, movies, shows = storage.load_catalog()
-    monkeypatch.setattr("builtins.input", lambda _: "99")
-
-    customer_cli.book_show_interactively(
-        actor=customer_auth_context("auth0|dana"),
-        halls=halls,
-        seats=seats,
-        movies=movies,
-        shows=shows,
-        booking_repository=storage.booking_repository,
-        user_repository=storage.user_repository,
-        current_time=show.start_time - timedelta(hours=2),
-    )
-    assert "not available" in capsys.readouterr().out
-
-
-def test_customer_cancel_success_and_mismatch(
-    environment: CinemaEnvironment, monkeypatch, capsys
-) -> None:
-    storage = environment.storage()
-    movie = storage.movie_repository.create(
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40)
-    )
-    show = storage.show_repository.create_many([
-        MovieShowDraft(movie.movie_id, 1, datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-            40)
-    ])[0]
-    _, _, seats, _, shows = storage.load_catalog()
-    user = storage.user_repository.create(
-        NewUser(
-            "auth0|dana",
-            "Dana Cohen",
-            "0501234567",
-            "dana@example.com",
-        )
-    )
-    request = customer_cli.BookingService.prepare_booking(
-        actor=customer_auth_context(user.auth_subject),
-        user=user,
-        show=show,
-        requested_seats=((1, 1),),
-        seats=seats,
-    )
-    booking, _ = storage.booking_repository.add(request)
-
-    answers = iter([str(booking.booking_id)])
-    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    cancel = iter(["1", "0501234567"])
+    monkeypatch.setattr("builtins.input", lambda _: next(cancel))
     customer_cli.cancel_booking_interactively(
-        actor=customer_auth_context("auth0|other"),
         seats=seats,
         shows=shows,
         booking_repository=storage.booking_repository,
         user_repository=storage.user_repository,
-        current_time=show.start_time - timedelta(hours=2),
-    )
-    assert "profile was not found" in capsys.readouterr().out
-
-    answers = iter([str(booking.booking_id)])
-    monkeypatch.setattr("builtins.input", lambda _: next(answers))
-    customer_cli.cancel_booking_interactively(
-        actor=customer_auth_context(user.auth_subject),
-        seats=seats,
-        shows=shows,
-        booking_repository=storage.booking_repository,
-        user_repository=storage.user_repository,
-        current_time=show.start_time - timedelta(hours=2),
+        current_time=now,
     )
     assert "cancelled" in capsys.readouterr().out
 
 
-def test_manager_input_helpers(monkeypatch, capsys) -> None:
-    values = iter(["x", "0", "3"])
-    monkeypatch.setattr("builtins.input", lambda _: next(values))
-    assert manager_cli.read_positive_int("X") == 3
-
-    values = iter(["x", "100", ""])
-    monkeypatch.setattr("builtins.input", lambda _: next(values))
-    assert manager_cli.read_ticket_price() == 40
-
-    values = iter([" ", "hello"])
-    monkeypatch.setattr("builtins.input", lambda _: next(values))
-    assert manager_cli.read_non_empty_text("X") == "hello"
-    assert capsys.readouterr().out
-
-
-def test_manager_movie_helpers(environment: CinemaEnvironment, monkeypatch, capsys) -> None:
-    storage = environment.storage()
-    scheduler = manager_cli.SchedulingService(
-        storage.config_repository,
-        storage.movie_repository,
-        storage.show_repository,
-    )
-    manager = manager_cli.CinemaManager(storage.movie_repository, scheduler)
-    actor = manager_auth_context("auth0|manager")
-    movie = manager.add_movie(
-        actor,
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40),
-    )
-
-    assert manager_cli.find_movie_by_id_or_title([movie], "1") == movie
-    assert manager_cli.find_movie_by_id_or_title([movie], "DUNE") == movie
-    assert manager_cli.find_movie_by_id_or_title([movie], "missing") is None
-
-    manager_cli.list_movies([])
-    assert "No movies" in capsys.readouterr().out
-    manager_cli.list_movies([movie])
-    assert "Dune" in capsys.readouterr().out
-
-    answers = iter(["Missing"])
-    monkeypatch.setattr("builtins.input", lambda _: next(answers))
-    assert manager_cli.schedule_movie_interactively([movie], manager, actor) == ()
-    assert "not found" in capsys.readouterr().out
-
-
-def test_manager_schedule_and_list_shows(
-    environment: CinemaEnvironment, monkeypatch, capsys
+def test_safe_wrapper_reports_expected_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    storage = environment.storage()
-    scheduler = manager_cli.SchedulingService(
-        storage.config_repository,
-        storage.movie_repository,
-        storage.show_repository,
-    )
-    manager = manager_cli.CinemaManager(storage.movie_repository, scheduler)
-    actor = manager_auth_context("auth0|manager")
-    movie = manager.add_movie(
-        actor,
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40),
-    )
-
-    monkeypatch.setattr(
-        manager_cli,
-        "local_now",
-        lambda: datetime(2026, 9, 1, 8, tzinfo=CINEMA_TIMEZONE),
-    )
-    monkeypatch.setattr("builtins.input", lambda _: "1")
-    shows = manager_cli.schedule_movie_interactively([movie], manager, actor)
-    assert len(shows) == 9
-
-    _, halls, _, movies, loaded_shows = storage.load_catalog()
-    monkeypatch.setattr("builtins.input", lambda _: "1")
-    manager_cli.list_shows_by_hall(halls, movies, loaded_shows)
-    assert "Hall Alpha Shows" in capsys.readouterr().out
-
-    monkeypatch.setattr("builtins.input", lambda _: "99")
-    manager_cli.list_shows_by_hall(halls, movies, loaded_shows)
-    assert "does not exist" in capsys.readouterr().out
-
-
-def test_manager_list_bookings_and_report(environment: CinemaEnvironment, capsys) -> None:
-    storage = environment.storage()
-    movie = storage.movie_repository.create(
-        NewMovie("Dune", 120, "Description", Genre.DRAMA, 40)
-    )
-    show = storage.show_repository.create_many([
-        MovieShowDraft(movie.movie_id, 1, datetime(2026, 9, 1, 18, tzinfo=CINEMA_TIMEZONE),
-            40)
-    ])[0]
-    user = storage.user_repository.create(
-        NewUser(
-            "auth0|dana",
-            "Dana Cohen",
-            "0501234567",
-            "dana@example.com",
-        )
-    )
-    booking, rows = storage.booking_repository.add(
-        BookingRequest(user.user_id, show.show_id, (1, 2))
-    )
-    _, halls, seats, movies, shows = storage.load_catalog()
-
-    manager_cli.list_bookings([], [], seats, shows, movies, halls)
-    assert "No bookings" in capsys.readouterr().out
-
-    manager_cli.list_bookings([booking], rows, seats, shows, movies, halls)
-    assert "80 NIS" in capsys.readouterr().out
-
-    manager_cli.print_report(storage)
-    out = capsys.readouterr().out
-    assert "Movies: 1" in out
-    assert "Total booked seats: 2" in out
-
-
-def test_error_handling_wrapper(monkeypatch, capsys) -> None:
-    from cinema.cli.error_handling import run_cli_safely
-    from cinema.exceptions import StorageError
-
+    monkeypatch.setattr("cinema.cli.error_handling.configure_logging", lambda: None)
     with pytest.raises(SystemExit):
         run_cli_safely(lambda: (_ for _ in ()).throw(StorageError("disk")))
-    assert "Application error: disk" in capsys.readouterr().out
+    assert "Application error" in capsys.readouterr().out
+
+
+def test_manager_listing_and_report_helpers(
+    environment: CinemaEnvironment,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    storage = environment.storage()
+    manager, scheduler = _manager(storage)
+    movie = manager.add_movie("Dune", 120, "Description", Genre.DRAMA, 40)
+    scheduler.schedule_movie(1, movie, date(2026, 9, 1), 1)
+    _, halls, seats, movies, shows = storage.load_catalog()
+    manager_cli.list_movies(movies)
+    monkeypatch.setattr("builtins.input", lambda _: "1")
+    manager_cli.list_shows_by_hall(halls, movies, shows)
+    user = LocalUserService(storage.user_repository).get_or_update(
+        "Dana Cohen", "0501234567", "dana@example.com"
+    )
+    request = BookingService.prepare_booking(
+        show=shows[0],
+        requested_seats=((1, 1),),
+        user_id=user.user_id or 0,
+        seats=seats,
+    )
+    storage.booking_repository.add(request)
+    bookings, rows = storage.load_bookings(shows, seats, [user])
+    manager_cli.list_bookings(bookings, rows, seats, shows, movies, halls)
+    manager_cli.print_report(storage)
+    output = capsys.readouterr().out
+    assert "Dune" in output and "Cinema Report" in output and "Seats: R1-S1" in output
+
+
+def test_customer_menu_routes_all_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    storage = MagicMock()
+    storage.load_catalog.return_value = (MagicMock(), [], [], [], [])
+    container = SimpleNamespace(storage=storage)
+    monkeypatch.setattr(customer_cli, "create_container", lambda _: container)
+    monkeypatch.setattr(customer_cli, "load_settings", MagicMock())
+    list_all = MagicMock()
+    list_genre = MagicMock()
+    book = MagicMock()
+    cancel = MagicMock()
+    monkeypatch.setattr(customer_cli, "list_upcoming_shows", list_all)
+    monkeypatch.setattr(customer_cli, "list_upcoming_shows_by_genre", list_genre)
+    monkeypatch.setattr(customer_cli, "book_show_interactively", book)
+    monkeypatch.setattr(customer_cli, "cancel_booking_interactively", cancel)
+    answers = iter(["1", "2", "3", "4", "unknown", "5"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    customer_cli.run_customer_cli()
+    list_all.assert_called_once()
+    list_genre.assert_called_once()
+    book.assert_called_once()
+    cancel.assert_called_once()
+
+
+def test_manager_menu_routes_all_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    storage = MagicMock()
+    storage.movie_repository.load.return_value = []
+    storage.user_repository.load.return_value = []
+    storage.load_catalog.return_value = (MagicMock(), [], [], [], [])
+    storage.load_bookings.return_value = ([], [])
+    container = SimpleNamespace(storage=storage)
+    monkeypatch.setattr(manager_cli, "create_container", lambda _: container)
+    monkeypatch.setattr(manager_cli, "load_settings", MagicMock())
+    helpers = {
+        name: MagicMock()
+        for name in (
+            "add_movie_interactively",
+            "schedule_movie_interactively",
+            "list_movies",
+            "list_shows_by_hall",
+            "list_bookings",
+            "print_report",
+        )
+    }
+    for name, helper in helpers.items():
+        monkeypatch.setattr(manager_cli, name, helper)
+    answers = iter(["1", "2", "3", "4", "5", "6", "unknown", "7"])
+    monkeypatch.setattr("builtins.input", lambda _: next(answers))
+    manager_cli.run_manager_cli()
+    assert all(helper.call_count == 1 for helper in helpers.values())
+
+
+def test_safe_wrapper_logs_unexpected_error(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr("cinema.cli.error_handling.configure_logging", lambda: None)
+    logger = MagicMock()
+    monkeypatch.setattr("cinema.cli.error_handling.LOGGER", logger)
+    with pytest.raises(SystemExit):
+        run_cli_safely(lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    logger.exception.assert_called_once()
+    assert "Unexpected" in capsys.readouterr().out
+
+
+def _manager(storage: StorageService) -> tuple[CinemaManager, SchedulingService]:
+    scheduler = SchedulingService(
+        storage.config_repository,
+        storage.movie_repository,
+        storage.show_repository,
+    )
+    return CinemaManager(storage.movie_repository, scheduler), scheduler

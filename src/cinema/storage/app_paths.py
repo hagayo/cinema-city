@@ -12,11 +12,7 @@ APP_NAME = "CinemaCity"
 
 def _runtime_path(environment_name: str, default_path: Path) -> Path:
     configured = os.environ.get(environment_name)
-    return (
-        Path(configured).expanduser().resolve()
-        if configured
-        else default_path.resolve()
-    )
+    return Path(configured).expanduser().resolve() if configured else default_path.resolve()
 
 
 DATA_DIR = _runtime_path(
@@ -39,13 +35,29 @@ LOG_FILE = LOG_DIR / "cinema.log"
 
 def bootstrap_data_directory() -> None:
     """Create the complete current-schema data set when the data directory is absent."""
-    if DATA_DIR.exists():
+    bootstrap_files(DATA_DIR)
+
+
+def bootstrap_files(data_dir: Path) -> None:
+    """Create a complete current-schema JSON data set in one directory."""
+    expected = {
+        "cinema_config.json",
+        "movies.json",
+        "shows.json",
+        "bookings.json",
+        "users.json",
+    }
+    existing = {path.name for path in data_dir.glob("*.json")} if data_dir.exists() else set()
+    if expected.issubset(existing):
         return
+    if existing:
+        missing = ", ".join(sorted(expected - existing))
+        raise RuntimeError(f"JSON data directory is incomplete; missing: {missing}")
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    data_dir.mkdir(parents=True, exist_ok=True)
 
-    CONFIG_FILE.write_text(
-        '{\n'
+    (data_dir / "cinema_config.json").write_text(
+        "{\n"
         f'  "schema_version": {SCHEMA_VERSION},\n'
         '  "cinema": {"cinema_id": 1, "name": "Cinema City"},\n'
         '  "halls": [\n'
@@ -55,30 +67,27 @@ def bootstrap_data_directory() -> None:
         '"rows": 20, "seats_per_row": 20},\n'
         '    {"hall_id": 3, "hall_name": "Hall 3", '
         '"rows": 20, "seats_per_row": 20}\n'
-        '  ]\n'
-        '}\n',
+        "  ]\n"
+        "}\n",
         encoding="utf-8",
     )
-    MOVIES_FILE.write_text(
-        f'{{\n  "schema_version": {SCHEMA_VERSION},\n'
-        '  "last_movie_id": 0,\n  "movies": []\n}\n',
+    (data_dir / "movies.json").write_text(
+        f'{{\n  "schema_version": {SCHEMA_VERSION},\n  "last_movie_id": 0,\n  "movies": []\n}}\n',
         encoding="utf-8",
     )
-    SHOWS_FILE.write_text(
-        f'{{\n  "schema_version": {SCHEMA_VERSION},\n'
-        '  "last_show_id": 0,\n  "shows": []\n}\n',
+    (data_dir / "shows.json").write_text(
+        f'{{\n  "schema_version": {SCHEMA_VERSION},\n  "last_show_id": 0,\n  "shows": []\n}}\n',
         encoding="utf-8",
     )
-    BOOKINGS_FILE.write_text(
+    (data_dir / "bookings.json").write_text(
         f'{{\n  "schema_version": {SCHEMA_VERSION},\n'
         '  "last_booking_id": 0,\n'
         '  "bookings": [],\n'
         '  "booking_seats": []\n}\n',
         encoding="utf-8",
     )
-    USERS_FILE.write_text(
-        f'{{\n  "schema_version": {SCHEMA_VERSION},\n'
-        '  "last_user_id": 0,\n  "users": []\n}\n',
+    (data_dir / "users.json").write_text(
+        f'{{\n  "schema_version": {SCHEMA_VERSION},\n  "last_user_id": 0,\n  "users": []\n}}\n',
         encoding="utf-8",
     )
 

@@ -4,7 +4,7 @@ from typing import Any
 
 from cinema.exceptions import StorageError
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 3
 
 
 def validate_schema_version(document: dict[str, Any]) -> None:
@@ -14,6 +14,4 @@ def validate_schema_version(document: dict[str, Any]) -> None:
 
     version = document["schema_version"]
     if version != SCHEMA_VERSION:
-        raise StorageError(
-            f"Unsupported data schema version {version}; expected {SCHEMA_VERSION}"
-        )
+        raise StorageError(f"Unsupported data schema version {version}; expected {SCHEMA_VERSION}")

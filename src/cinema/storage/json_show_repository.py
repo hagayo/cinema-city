@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from cinema.exceptions import BusinessError, StorageError
-from cinema.models import MovieShow, MovieShowDraft
+from cinema.models import MovieShow
 from cinema.storage.app_paths import SHOWS_FILE, STATE_LOCK_FILE
 from cinema.storage.interfaces import ShowRepository
 from cinema.storage.json_file import (
@@ -59,9 +59,32 @@ class JsonShowRepository(ShowRepository):
         ) as error:
             raise StorageError(f"Could not load show data from {self._file_path}") from error
 
-    def create_many(self, drafts: list[MovieShowDraft]) -> list[MovieShow]:
-        if not drafts:
+    def find_by_id(self, show_id: int) -> MovieShow | None:
+        """Return a show without requiring the caller to supply FK snapshots."""
+        try:
+            with exclusive_file_lock(self._file_path):
+                _, data = self._read_document()
+            return next(
+                (show for show in map(self._deserialize, data) if show.show_id == show_id),
+                None,
+            )
+        except StorageError:
+            raise
+        except (
+            OSError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+            BusinessError,
+        ) as error:
+            raise StorageError(f"Could not load show data from {self._file_path}") from error
+
+    def create_many(self, shows: list[MovieShow]) -> list[int]:
+        if not shows:
             return []
+        if any(show.show_id is not None for show in shows):
+            raise StorageError("New shows must not already have IDs")
 
         try:
             with exclusive_lock(self._state_lock_path):
@@ -70,12 +93,12 @@ class JsonShowRepository(ShowRepository):
                     created = [
                         MovieShow(
                             show_id=last_show_id + index,
-                            movie_id=draft.movie_id,
-                            hall_id=draft.hall_id,
-                            start_time=draft.start_time,
-                            ticket_price=draft.ticket_price,
+                            movie_id=show.movie_id,
+                            hall_id=show.hall_id,
+                            start_time=show.start_time,
+                            ticket_price=show.ticket_price,
                         )
-                        for index, draft in enumerate(drafts, start=1)
+                        for index, show in enumerate(shows, start=1)
                     ]
                     data.extend(self._serialize(show) for show in created)
                     atomic_write_json(
@@ -86,7 +109,7 @@ class JsonShowRepository(ShowRepository):
                             "shows": data,
                         },
                     )
-                    return created
+                    return [self._require_id(show) for show in created]
         except StorageError:
             raise
         except (
@@ -122,7 +145,9 @@ class JsonShowRepository(ShowRepository):
         valid_hall_ids: set[int],
         valid_movie_ids: set[int],
     ) -> None:
-        show_ids = [show.show_id for show in shows]
+        if any(show.show_id is None for show in shows):
+            raise StorageError("Persisted show is missing its ID")
+        show_ids = [show.show_id for show in shows if show.show_id is not None]
         if len(show_ids) != len(set(show_ids)):
             raise StorageError("Show data contains duplicate show IDs")
         if last_show_id < max(show_ids, default=0):
@@ -136,6 +161,8 @@ class JsonShowRepository(ShowRepository):
 
     @staticmethod
     def _serialize(show: MovieShow) -> dict[str, Any]:
+        if show.show_id is None:
+            raise StorageError("Cannot serialize a show without an ID")
         return {
             "show_id": show.show_id,
             "movie_id": show.movie_id,
@@ -153,3 +180,9 @@ class JsonShowRepository(ShowRepository):
             start_time=from_storage_iso(str(item["start_time"])),
             ticket_price=int(item["ticket_price"]),
         )
+
+    @staticmethod
+    def _require_id(show: MovieShow) -> int:
+        if show.show_id is None:
+            raise StorageError("Persisted show has no ID")
+        return show.show_id

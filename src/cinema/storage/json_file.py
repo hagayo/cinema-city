@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from filelock import FileLock, Timeout
 
@@ -27,8 +28,7 @@ def exclusive_lock(lock_path: Path) -> Iterator[None]:
             yield
     except Timeout as error:
         raise StorageError(
-            f"Could not acquire lock {lock_path} "
-            f"within {LOCK_TIMEOUT_SECONDS} seconds"
+            f"Could not acquire lock {lock_path} within {LOCK_TIMEOUT_SECONDS} seconds"
         ) from error
 
 

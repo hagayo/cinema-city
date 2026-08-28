@@ -7,7 +7,7 @@ from cinema.exceptions import BookingValidationError
 
 @dataclass(frozen=True, slots=True)
 class BookingSeat:
-    """Represent one booking_seats row."""
+    """Represent one booking_seats junction-table row."""
 
     booking_id: int
     show_id: int

@@ -2,18 +2,7 @@
 
 from datetime import datetime
 
-from cinema.models import (
-    Cinema,
-    Genre,
-    Hall,
-    Movie,
-    MovieShow,
-    NewMovie,
-    Seat,
-    User,
-    customer_auth_context,
-    manager_auth_context,
-)
+from cinema.models import Cinema, Genre, Hall, Movie, MovieShow, Seat, User
 from cinema.time_utils import CINEMA_TIMEZONE
 
 
@@ -25,10 +14,7 @@ def make_cinema(
 
 
 def make_halls(count: int = 3) -> list[Hall]:
-    return [
-        Hall(hall_id=index, hall_name=f"Hall {index}")
-        for index in range(1, count + 1)
-    ]
+    return [Hall(hall_id=index, hall_name=f"Hall {index}") for index in range(1, count + 1)]
 
 
 def make_seats(
@@ -110,39 +96,15 @@ def make_small_seats(hall_id: int = 1) -> list[Seat]:
 
 def make_user(
     user_id: int = 1,
-    auth_subject: str = "auth0|dana",
     full_name: str = "Dana Cohen",
     phone_number: str = "+972501234567",
     email: str = "dana@example.com",
 ) -> User:
     return User(
         user_id=user_id,
-        auth_subject=auth_subject,
+        auth_provider="local",
+        auth_subject=email,
         full_name=full_name,
         phone_number=phone_number,
         email=email,
     )
-
-
-def make_new_movie(
-    title: str = "Dune",
-    duration_minutes: int = 120,
-    description: str = "Description",
-    genre: Genre = Genre.DRAMA,
-    ticket_price: int = 40,
-) -> NewMovie:
-    return NewMovie(
-        title=title,
-        duration_minutes=duration_minutes,
-        description=description,
-        genre=genre,
-        ticket_price=ticket_price,
-    )
-
-
-def make_manager_actor():
-    return manager_auth_context("auth0|manager")
-
-
-def make_customer_actor(auth_subject: str = "auth0|dana"):
-    return customer_auth_context(auth_subject)
