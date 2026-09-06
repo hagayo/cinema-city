@@ -23,12 +23,6 @@ updates:
       security-updates:
         patterns:
           - "*"
-        update-types:
-          - "security"
       version-updates:
         patterns:
           - "*"
-        update-types:
-          - "semver:major"
-          - "semver:minor"
-          - "semver:patch"
