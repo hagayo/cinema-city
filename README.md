@@ -1,3 +1,6 @@
+[![OpenSSF Scorecard](https://securityscorecards.devhagayo/cinema-city/badge)](https://securityscorecards.dev/viewer/?uri=github.com/hagayo/cinema-city
+
+
 # Cinema City
 
 Current version: **10.5.2**

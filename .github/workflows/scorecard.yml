@@ -1,0 +1,50 @@
+name: OpenSSF Scorecard
+
+on:
+  # once a week, every sunday at 00:00
+  schedule:
+    - cron: '0 0 * * 0'
+  push:
+    branches: [ "main", "master" ]
+  # enable manual activation from Actions tab
+  workflow_dispatch:
+
+# remove all global permissions
+permissions: {}
+
+jobs:
+  analysis:
+    name: Scorecard analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      id-token: write
+      contents: read
+      actions: read
+
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: "Run analysis"
+        uses: ossf/scorecard-action@f49aabe0b5af0936a0987cfb85d86b75731b0186 # v2.4.2
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # publish results to OpenSSF (generates Badge for the README file)
+          publish_results: true
+
+      # upload report to Security -> Code Scanning tab in github web
+      - name: "Upload artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: "Upload to code-scanning"
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results.sarif

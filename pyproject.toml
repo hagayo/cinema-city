@@ -60,8 +60,17 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
-ignore = []
+select = ["E", "W", "F", "I", "B", "A", "C4", "UP", "S", "ARG", "PTH", "SIM", ]
+deny = ["ALL"] 
+ignore = ["E501",]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "S105", "ARG001", ]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
 
 [tool.mypy]
 python_version = "3.12"
