@@ -1,0 +1,6 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore tests directory"
+paths = [ '''^tests/''' ] 
