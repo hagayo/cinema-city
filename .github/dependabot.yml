@@ -13,11 +13,11 @@ updates:
     schedule:
       interval: "weekly"         # daily / weekly / monthly
     cooldown:
-        default-days: 7
+      default-days: 7
     groups:                      # define Pull-Requests unite groups
-      security-updates:
-        patterns:
-          - "*"
-      version-updates:
-        patterns:
-          - "*"
+      uv-version-updates:
+        applies-to: "version-updates"
+        patterns: ["*"]
+      uv-security-updates:
+        applies-to: "security-updates"
+        patterns: ["*"]
