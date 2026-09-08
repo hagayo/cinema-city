@@ -6,12 +6,15 @@ updates:
       interval: "weekly"
     groups:
       actions-updates:
-        patterns: ["*"]
+        patterns:
+          - "actions/checkout"
+          - "actions/upload-artifact"
+          - "gitleaks/gitleaks-action"
 
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "daily"         # daily / weekly / monthly
+      interval: "weekly"         # daily / weekly / monthly
     cooldown:
       default-days: 7
     groups:                      # define Pull-Requests unite groups
