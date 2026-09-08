@@ -84,7 +84,6 @@ class Settings(BaseSettings):
     d1_api_token: str = ""
     mongodb_uri: str = ""
     mongodb_database: str = "cinema_city"
-    auto_create_schema: bool = False
 
     @property
     def manager_email_set(self) -> frozenset[str]:

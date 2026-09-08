@@ -226,7 +226,7 @@ def run_manager_cli() -> None:
 
     while True:
         print(
-            "\nCinema Manager\n"
+            "\nHello Cinema Manager\n"
             "1. Add movie\n"
             "2. Schedule movie\n"
             "3. List movies\n"

@@ -1,12 +1,22 @@
 """Shared fixtures for schema-v3 repository and service tests."""
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from alembic import command
+from alembic.config import Config
 
 from cinema.storage import StorageService, create_json_storage_service
+from cinema.storage.sqlalchemy_backend import (
+    create_database_engine,
+    create_neon_storage_service,
+)
+from cinema.storage.sqlalchemy_seed import seed_cinema
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,3 +109,22 @@ def environment(tmp_path: Path) -> CinemaEnvironment:
         encoding="utf-8",
     )
     return env
+
+
+@pytest.fixture
+def sql_storage_factory() -> Callable[[Path], StorageService]:
+    """Create a repository facade on a database initialized only through Alembic."""
+
+    def create(database_file: Path) -> StorageService:
+        database_url = f"sqlite+pysqlite:///{database_file}"
+        alembic_config = Config(str(PROJECT_ROOT / "alembic.ini"))
+        alembic_config.set_main_option("sqlalchemy.url", database_url)
+        command.upgrade(alembic_config, "head")
+        engine = create_database_engine(database_url)
+        try:
+            seed_cinema(engine)
+        finally:
+            engine.dispose()
+        return create_neon_storage_service(database_url)
+
+    return create

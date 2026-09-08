@@ -1,6 +1,6 @@
 # Cinema City
 
-Current version: **9.7.2**
+Current version: **10.5.2**
 
 Production-style Python teaching project for cinema scheduling, booking,
 repository abstractions, persistence, testing, and future Cloudflare D1 integration.
@@ -13,9 +13,9 @@ repository abstractions, persistence, testing, and future Cloudflare D1 integrat
 - `NoAuthAuthenticationService` מפורש לפיתוח מקומי ללא אינטרנט
 - `ClerkAuthenticationService` עם אימות JWT בצד השרת ומיפוי ל-`user_id` פנימי
 - JSON מקומי עם `filelock`, כתיבה אטומית ונתיבי `platformdirs`
-- PostgreSQL/Neon עם Foreign Keys, Check Constraints והגנת DB מפני הזמנה כפולה
+- PostgreSQL/Neon עם Alembic, Foreign Keys, Check Constraints והגנת DB מפני הזמנה כפולה
 - Composition Root יחיד לבחירת Authentication, Storage ו-Gateway
-- 109 בדיקות Unit, Integration ו-Repository Contract עם כיסוי של לפחות 90%
+- בדיקות Unit, Integration, Migration ו-Repository Contract עם כיסוי של לפחות 90%
 
 ## התחלה מהירה
 
@@ -80,7 +80,11 @@ src/cinema/
 ├── storage/           # Interfaces, JSON ו-Neon
 ├── web/               # FastAPI ונכסי Vanilla Web
 ├── composition.py     # Composition Root יחיד
-└── db_init.py         # אתחול DB מפורש לפריסה
+└── db_seed.py         # נתוני Seed מפורשים לאחר migration
+
+database/
+├── migrations/        # היסטוריית Alembic
+└── schema.sql         # תמונת מצב מלאה של PostgreSQL
 ```
 
 כיוון התלות:
@@ -145,16 +149,26 @@ bookings.json
 ```env
 STORAGE_BACKEND=neon
 NEON_DATABASE_URL=postgresql://...
-AUTO_CREATE_SCHEMA=false
 ```
 
-לפני העלאת שרת חדש מריצים פעם אחת כחלק מתהליך ה-Release:
+במסד חדש, ולפני כל גרסת שרת חדשה, מריצים את כל ה-migrations שטרם הוחלו:
 
 ```bash
-uv run cinema-db-init
+uv run alembic upgrade head
+uv run cinema-db-seed
 ```
 
-השרת עצמו אינו מקבל כברירת מחדל הרשאת DDL. במסד הנתונים נאכפים PK, FK, טווחים, זהות חיצונית ייחודית ו-`UNIQUE(show_id, seat_id)`.
+`cinema-db-seed` הוא idempotent ומוסיף רק את הקולנוע, שלושת האולמות והמושבים החסרים במסד ריק. השרת עצמו אינו יוצר או משנה טבלאות ואינו זקוק להרשאת DDL.
+
+המיגרציות תחת `database/migrations/versions` הן היסטוריית השינויים. `database/schema.sql` הוא snapshot קריא וניתן להרצה של המבנה הנוכחי, אך אינו נערך ידנית. להפקה מחדש ב-PowerShell:
+
+```powershell
+$env:STORAGE_BACKEND = "neon"
+$env:NEON_DATABASE_URL = "postgresql://localhost/cinema_city"
+uv run alembic upgrade head --sql | Set-Content -Encoding utf8 database/schema.sql
+```
+
+לפני החלת migration שנוצר באמצעות `--autogenerate`, בודקים ועורכים אותו ידנית לפי הצורך. במסד הנתונים נאכפים PK, FK, טווחים, זהות חיצונית ייחודית ו-`UNIQUE(show_id, seat_id)`.
 
 ### D1 ו-MongoDB
 
@@ -236,8 +250,8 @@ ruff format --check
 ## Docker
 
 ```bash
-docker build -t cinema-city:10.0.0 .
-docker run --rm -p 8080:8080 --env-file .env.production cinema-city:10.0.0
+docker build -t cinema-city:10.5.2 .
+docker run --rm -p 8080:8080 --env-file .env.production cinema-city:10.5.2
 ```
 
 לפריסה מלאה והקשחת אבטחה ראו:

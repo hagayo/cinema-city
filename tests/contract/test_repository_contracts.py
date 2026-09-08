@@ -15,7 +15,6 @@ from cinema.exceptions import (
 )
 from cinema.models import BookingRequest, Genre, Movie, MovieShow, User
 from cinema.storage import StorageService, create_json_storage_service
-from cinema.storage.sqlalchemy_backend import create_neon_storage_service
 from cinema.time_utils import CINEMA_TIMEZONE
 
 StorageFactory = Callable[[Path], StorageService]
@@ -25,7 +24,8 @@ StorageFactory = Callable[[Path], StorageService]
 def storage(request: pytest.FixtureRequest, tmp_path: Path) -> StorageService:
     if request.param == "json":
         return create_json_storage_service(data_dir=tmp_path / "json")
-    return create_neon_storage_service(f"sqlite+pysqlite:///{tmp_path / 'cinema.db'}")
+    factory: StorageFactory = request.getfixturevalue("sql_storage_factory")
+    return factory(tmp_path / "cinema.db")
 
 
 def test_movie_repository_contract(storage: StorageService) -> None:
@@ -81,8 +81,11 @@ def test_show_and_booking_repository_contract(storage: StorageService) -> None:
     assert storage.booking_repository.delete(booking_id, user_id) == 2
 
 
-def test_relational_adapter_error_and_lookup_contracts(tmp_path: Path) -> None:
-    storage = create_neon_storage_service(f"sqlite+pysqlite:///{tmp_path / 'errors.db'}")
+def test_relational_adapter_error_and_lookup_contracts(
+    tmp_path: Path,
+    sql_storage_factory: StorageFactory,
+) -> None:
+    storage = sql_storage_factory(tmp_path / "errors.db")
     movies = storage.movie_repository
     movie_id = movies.create(Movie(None, "Dune", 120, "Description", Genre.DRAMA, 40))
     with pytest.raises(StorageError, match="already exists"):

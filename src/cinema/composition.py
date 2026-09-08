@@ -62,10 +62,7 @@ def create_storage_service(settings: Settings) -> StorageService:
     if settings.storage_backend is StorageBackend.JSON:
         return create_json_storage_service(data_dir=settings.cinema_data_dir)
     if settings.storage_backend is StorageBackend.NEON:
-        return create_neon_storage_service(
-            settings.neon_database_url,
-            initialize_schema=settings.auto_create_schema,
-        )
+        return create_neon_storage_service(settings.neon_database_url)
     raise ConfigurationError(
         f"The {settings.storage_backend.value} adapter is reserved but not shipped. "
         "Use json locally or neon in production."

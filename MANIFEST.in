@@ -1,0 +1,5 @@
+include alembic.ini
+recursive-include database *.py *.mako *.sql
+recursive-include docs *.md
+recursive-include scripts *.bat *.sh
+recursive-include data *.json

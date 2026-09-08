@@ -6,6 +6,72 @@
     <meta name="description" content="ממשק ניהול מאובטח לסינמה סיטי">
     <title>Cinema City - ניהול</title>
     <link rel="stylesheet" href="/assets/styles.css">
+    <style>
+      .manager-actions {
+        display: grid;
+        gap: 16px;
+      }
+
+      .manager-disclosure {
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        background: var(--white);
+        box-shadow: 0 14px 35px rgba(11, 25, 48, 0.07);
+      }
+
+      .manager-disclosure > summary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 18px 22px;
+        color: var(--blue);
+        font-size: 1.2rem;
+        font-weight: 800;
+        cursor: pointer;
+        list-style: none;
+      }
+
+      .manager-disclosure > summary::-webkit-details-marker {
+        display: none;
+      }
+
+      .manager-disclosure > summary::after {
+        content: "+";
+        display: grid;
+        width: 32px;
+        height: 32px;
+        flex: 0 0 32px;
+        place-items: center;
+        border: 1px solid var(--border);
+        border-radius: 50%;
+        background: var(--cream);
+        font-size: 1.35rem;
+        line-height: 1;
+      }
+
+      .manager-disclosure[open] > summary {
+        border-bottom: 1px solid var(--border);
+        background: #eef3f8;
+      }
+
+      .manager-disclosure[open] > summary::after {
+        content: "−";
+      }
+
+      .manager-disclosure > summary:focus-visible {
+        outline: 3px solid rgba(255, 122, 26, 0.45);
+        outline-offset: -3px;
+      }
+
+      .manager-disclosure > .panel {
+        margin: 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+      }
+    </style>
     <script type="module" src="/assets/manager.js"></script>
     <link rel="icon" href="/assets/favicon.ico" sizes="any">
   </head>
@@ -21,63 +87,70 @@
         <p>כל פעולה רגישה נבדקת מחדש בשרת.</p>
       </section>
       <p id="status" class="status" role="status"></p>
-      <section class="manager-grid">
-        <form id="movie-form" class="panel form-panel">
-          <h2>הוספת סרט</h2>
-          <label>שם הסרט <input name="title" required maxlength="200"></label>
-          <label>משך בדקות <input name="duration_minutes" type="number" min="1" max="240" required></label>
-          <label>תיאור <textarea name="description" required maxlength="300"></textarea></label>
-          <label>ז'אנר
-            <select name="genre" required>
-              <option value="comedy">קומדיה</option><option value="drama">דרמה</option>
-              <option value="thriller">מתח</option><option value="crime">פשע</option>
-              <option value="family">משפחה</option>
-            </select>
-          </label>
-          <label>מחיר כרטיס <input name="ticket_price" type="number" min="1" max="99" value="40" required></label>
-          <button class="button" type="submit">הוספת סרט</button>
-        </form>
-        <form id="schedule-form" class="panel form-panel">
-          <h2>תזמון הקרנות</h2>
-          <label>סרט <select id="movie-select" name="movie_id" required></select></label>
-          <label>תאריך <input name="screening_date" type="date" required></label>
-          <label>אולם
-            <select name="hall_id"><option value="">כל האולמות</option><option value="1">אולם 1</option><option value="2">אולם 2</option><option value="3">אולם 3</option></select>
-          </label>
-          <label>הקרנות לאולם <input name="shows_count" type="number" min="1" max="10" value="3" required></label>
-          <button class="button" type="submit">יצירת לוח הקרנות</button>
-        </form>
+      <section class="manager-actions" aria-label="פעולות ניהול">
+        <details class="manager-disclosure" name="manager-action">
+          <summary>הוספת סרט</summary>
+          <form id="movie-form" class="panel form-panel">
+            <label>שם הסרט <input name="title" required maxlength="200"></label>
+            <label>משך בדקות <input name="duration_minutes" type="number" min="1" max="240" required></label>
+            <label>תיאור <textarea name="description" required maxlength="300"></textarea></label>
+            <label>ז'אנר
+              <select name="genre" required>
+                <option value="comedy">קומדיה</option><option value="drama">דרמה</option>
+                <option value="thriller">מתח</option><option value="crime">פשע</option>
+                <option value="family">משפחה</option>
+              </select>
+            </label>
+            <label>מחיר כרטיס <input name="ticket_price" type="number" min="1" max="99" value="40" required></label>
+            <button class="button" type="submit">הוספת סרט</button>
+          </form>
+        </details>
+
+        <details class="manager-disclosure" name="manager-action">
+          <summary>תזמון הקרנות</summary>
+          <form id="schedule-form" class="panel form-panel">
+            <label>סרט <select id="movie-select" name="movie_id" required></select></label>
+            <label>תאריך <input name="screening_date" type="date" required></label>
+            <label>אולם
+              <select name="hall_id"><option value="">כל האולמות</option><option value="1">אולם 1</option><option value="2">אולם 2</option><option value="3">אולם 3</option></select>
+            </label>
+            <label>הקרנות לאולם <input name="shows_count" type="number" min="1" max="10" value="3" required></label>
+            <button class="button" type="submit">יצירת לוח הקרנות</button>
+          </form>
+        </details>
+
+        <details class="manager-disclosure" name="manager-action">
+          <summary>לוח הקרנות לשבוע הקרוב</summary>
+          <section class="panel schedule-view">
+            <div class="panel-heading">
+              <div>
+                <p>הקרנות עתידיות לפי תאריך ושעה</p>
+              </div>
+
+              <div class="schedule-toolbar">
+                <label for="schedule-hall-filter">אולם</label>
+
+                <select id="schedule-hall-filter">
+                  <option value="">כל האולמות</option>
+                  <option value="1">אולם 1</option>
+                  <option value="2">אולם 2</option>
+                  <option value="3">אולם 3</option>
+                </select>
+
+                <button id="load-schedule"
+                        class="button secondary"
+                        type="button">
+                  הצגת הלוח
+                </button>
+              </div>
+            </div>
+
+            <div id="schedule-results"
+                 class="schedule-list"
+                 aria-live="polite"></div>
+          </section>
+        </details>
       </section>
-      
-    <section class="panel schedule-view">
-      <div class="panel-heading">
-        <div>
-          <h2>לוח הקרנות לשבוע הקרוב</h2>
-          <p>הקרנות עתידיות לפי תאריך ושעה</p>
-        </div>
-
-        <div class="schedule-toolbar">
-          <label for="schedule-hall-filter">אולם</label>
-
-          <select id="schedule-hall-filter">
-            <option value="">כל האולמות</option>
-            <option value="1">אולם 1</option>
-            <option value="2">אולם 2</option>
-            <option value="3">אולם 3</option>
-          </select>
-
-          <button id="load-schedule"
-                  class="button secondary"
-                  type="button">
-            הצגת הלוח
-          </button>
-        </div>
-      </div>
-
-      <div id="schedule-results"
-           class="schedule-list"
-           aria-live="polite"></div>
-    </section>
 
       <section class="panel report-panel">
         <div class="panel-heading"><h2>דו"ח מצב</h2><button id="refresh-report" class="button secondary" type="button">רענון</button></div>

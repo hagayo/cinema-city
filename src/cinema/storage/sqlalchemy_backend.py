@@ -2,22 +2,7 @@
 
 from typing import Any
 
-from sqlalchemy import (
-    CheckConstraint,
-    Column,
-    Engine,
-    ForeignKey,
-    Integer,
-    MetaData,
-    String,
-    Table,
-    UniqueConstraint,
-    create_engine,
-    delete,
-    insert,
-    select,
-    update,
-)
+from sqlalchemy import Engine, create_engine, delete, insert, select, update
 from sqlalchemy.engine import Connection, CursorResult, RowMapping
 from sqlalchemy.exc import IntegrityError
 
@@ -52,99 +37,33 @@ from cinema.storage.interfaces import (
     ShowRepository,
     UserRepository,
 )
+from cinema.storage.sqlalchemy_schema import (
+    booking_seats,
+    bookings,
+    cinemas,
+    halls,
+    movies,
+    seats,
+    shows,
+    users,
+)
 from cinema.storage.storage_service import StorageService
 from cinema.time_utils import from_storage_iso, to_utc_iso
 
-metadata = MetaData()
 
-cinemas = Table(
-    "cinemas",
-    metadata,
-    Column("cinema_id", Integer, primary_key=True),
-    Column("name", String(200), nullable=False),
-)
-halls = Table(
-    "halls",
-    metadata,
-    Column("hall_id", Integer, primary_key=True),
-    Column("cinema_id", Integer, ForeignKey("cinemas.cinema_id"), nullable=False),
-    Column("hall_name", String(100), nullable=False),
-)
-seats = Table(
-    "seats",
-    metadata,
-    Column("seat_id", Integer, primary_key=True),
-    Column("hall_id", Integer, ForeignKey("halls.hall_id"), nullable=False),
-    Column("row_number", Integer, nullable=False),
-    Column("seat_number", Integer, nullable=False),
-    UniqueConstraint("hall_id", "row_number", "seat_number"),
-    CheckConstraint("row_number > 0"),
-    CheckConstraint("seat_number > 0"),
-)
-movies = Table(
-    "movies",
-    metadata,
-    Column("movie_id", Integer, primary_key=True, autoincrement=True),
-    Column("title", String(200), nullable=False, unique=True),
-    Column("duration_minutes", Integer, nullable=False),
-    Column("description", String(300), nullable=False),
-    Column("genre", String(30), nullable=False),
-    Column("ticket_price", Integer, nullable=False),
-    CheckConstraint("duration_minutes BETWEEN 1 AND 240"),
-    CheckConstraint("ticket_price BETWEEN 1 AND 99"),
-)
-shows = Table(
-    "shows",
-    metadata,
-    Column("show_id", Integer, primary_key=True, autoincrement=True),
-    Column("movie_id", Integer, ForeignKey("movies.movie_id"), nullable=False),
-    Column("hall_id", Integer, ForeignKey("halls.hall_id"), nullable=False),
-    Column("start_time", String(64), nullable=False),
-    Column("ticket_price", Integer, nullable=False),
-    CheckConstraint("ticket_price BETWEEN 1 AND 99"),
-)
-users = Table(
-    "users",
-    metadata,
-    Column("user_id", Integer, primary_key=True, autoincrement=True),
-    Column("auth_provider", String(50), nullable=False),
-    Column("auth_subject", String(255), nullable=False),
-    Column("full_name", String(200), nullable=False),
-    Column("phone_number", String(30), nullable=True, unique=True),
-    Column("email", String(320), nullable=True, unique=True),
-    UniqueConstraint("auth_provider", "auth_subject"),
-)
-bookings = Table(
-    "bookings",
-    metadata,
-    Column("booking_id", Integer, primary_key=True, autoincrement=True),
-    Column("user_id", Integer, ForeignKey("users.user_id"), nullable=False),
-    Column("show_id", Integer, ForeignKey("shows.show_id"), nullable=False),
-)
-booking_seats = Table(
-    "booking_seats",
-    metadata,
-    Column(
-        "booking_id", Integer, ForeignKey("bookings.booking_id", ondelete="CASCADE"), nullable=False
-    ),
-    Column("show_id", Integer, ForeignKey("shows.show_id"), nullable=False),
-    Column("seat_id", Integer, ForeignKey("seats.seat_id"), nullable=False),
-    UniqueConstraint("booking_id", "seat_id"),
-    UniqueConstraint("show_id", "seat_id"),
-)
+def normalize_database_url(database_url: str) -> str:
+    """Select Psycopg 3 when a generic PostgreSQL URL is supplied."""
+    return database_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 
-def create_neon_storage_service(
-    database_url: str,
-    *,
-    initialize_schema: bool = True,
-) -> StorageService:
-    """Create a relational storage facade and ensure baseline schema exists."""
-    normalized_url = database_url.replace("postgresql://", "postgresql+psycopg://", 1)
-    engine = create_engine(normalized_url, pool_pre_ping=True)
-    if initialize_schema:
-        metadata.create_all(engine)
-        _seed_cinema(engine)
+def create_database_engine(database_url: str) -> Engine:
+    """Create the SQLAlchemy engine shared by repositories and maintenance commands."""
+    return create_engine(normalize_database_url(database_url), pool_pre_ping=True)
+
+
+def create_neon_storage_service(database_url: str) -> StorageService:
+    """Create relational repositories without performing DDL or seed operations."""
+    engine = create_database_engine(database_url)
     return StorageService(
         config_repository=SqlCinemaConfigRepository(engine),
         movie_repository=SqlMovieRepository(engine),
@@ -152,34 +71,6 @@ def create_neon_storage_service(
         booking_repository=SqlBookingRepository(engine),
         user_repository=SqlUserRepository(engine),
     )
-
-
-def _seed_cinema(engine: Engine) -> None:
-    with engine.begin() as connection:
-        if connection.execute(select(cinemas.c.cinema_id)).first() is not None:
-            return
-        connection.execute(insert(cinemas), {"cinema_id": 1, "name": "Cinema City"})
-        connection.execute(
-            insert(halls),
-            [
-                {"hall_id": hall_id, "cinema_id": 1, "hall_name": f"Hall {hall_id}"}
-                for hall_id in range(1, 4)
-            ],
-        )
-        connection.execute(
-            insert(seats),
-            [
-                {
-                    "seat_id": ((hall_id - 1) * 400) + ((row - 1) * 20) + number,
-                    "hall_id": hall_id,
-                    "row_number": row,
-                    "seat_number": number,
-                }
-                for hall_id in range(1, 4)
-                for row in range(1, 21)
-                for number in range(1, 21)
-            ],
-        )
 
 
 class SqlCinemaConfigRepository(CinemaConfigRepository):

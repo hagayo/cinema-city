@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from cinema import db_init
+from cinema import db_seed
 from cinema.composition import create_storage_service
 from cinema.config import AppEnvironment, AuthProvider, Settings, StorageBackend, load_settings
 from cinema.exceptions import ConfigurationError
@@ -37,14 +37,18 @@ def test_composition_selects_json_and_rejects_reserved_adapters(tmp_path: Path) 
         create_storage_service(Settings(storage_backend=StorageBackend.D1))
 
 
-def test_explicit_database_initializer(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_explicit_database_seed(monkeypatch: pytest.MonkeyPatch) -> None:
     with pytest.raises(ConfigurationError, match="supports"):
-        db_init.main()
+        db_seed.main()
     settings = Settings(
         storage_backend=StorageBackend.NEON,
         neon_database_url="postgresql://example.invalid/db",
     )
-    monkeypatch.setattr(db_init, "load_settings", lambda: settings)
-    create = MagicMock()
-    monkeypatch.setattr(db_init, "create_neon_storage_service", create)
-    db_init.main()
+    monkeypatch.setattr(db_seed, "load_settings", lambda: settings)
+    engine = MagicMock()
+    monkeypatch.setattr(db_seed, "create_database_engine", lambda _url: engine)
+    seed = MagicMock()
+    monkeypatch.setattr(db_seed, "seed_cinema", seed)
+    db_seed.main()
+    seed.assert_called_once_with(engine)
+    engine.dispose.assert_called_once_with()
