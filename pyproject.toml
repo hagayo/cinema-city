@@ -26,7 +26,11 @@ cinema-manager-web = "cinema.web.app:manager_main"
 cinema-db-seed = "cinema.db_seed:main"
 
 [dependency-groups]
+commit = [
+    "pre-commit>=4.6.2",
+]
 dev = [
+    "bandit[toml]>=1.9.4",
     "httpx2>=2.12.0",
     "mypy>=2.3.1",
     "pylint>=4.0.7",
@@ -95,6 +99,6 @@ min-similarity-lines = 12
 
 [tool.bandit]
 targets = ["."]
-exclude_dirs = ["tests", "venv", ".venv"]
-skips = ["B101"]        # Optional: Skips assert warnings
-sev_level = "MEDIUM"    # Or "LOW" if you want to track smaller issues 
+exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
+skips = ["B101", "B104"]    # Skips assert warnings, and bind to 0.0.0.0
+sev_level = "MEDIUM"        # Or "LOW" if you want to track smaller issues 

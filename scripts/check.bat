@@ -45,9 +45,17 @@ echo.
 echo ========================================
 echo Running Bandit (Security scan)
 echo ========================================
-run: uvx bandit -ll -r . -x tests,venv,.venv
+uvx bandit -ll -r . -x tests,venv,.venv
 if errorlevel 1 goto bandit_failed
 echo OK: Bandit Security-Scan passed.
+
+echo.
+echo ========================================
+echo Running Vulture (Dead-Code scan)
+echo ========================================
+uv run --preview-features malware-check vulture . --min-confidence 100 --exclude "*/.venv/*"
+if errorlevel 1 goto vulture_failed
+echo OK: Vulture Dead-Code Scan passed.
 
 echo.
 echo ========================================
@@ -84,4 +92,9 @@ exit /b 1
 :bandit_failed
 echo.
 echo ERROR: Bandit Security-Scan failed.
+exit /b 1
+
+:vulture_failed
+echo.
+echo ERROR: Vulture Dead-Code Scan failed.
 exit /b 1

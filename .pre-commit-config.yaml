@@ -1,0 +1,37 @@
+repos:
+
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run --preview-features malware-check ruff check --fix
+        language: system
+        types: [python]
+
+      - id: mypy
+        name: mypy
+        entry: uv run --preview-features malware-check mypy
+        pass_filenames: false
+        language: system
+        types: [python]
+
+      - id: bandit
+        name: bandit[toml]
+        entry: uvx --preview-features malware-check bandit -ll -r . -x tests,venv,.venv
+        pass_filenames: false    # Crucial: stops pre-commit from breaking the custom path arguments
+        language: system
+        types: [python]
+
+      - id: vulture
+        name: vulture
+        entry: uv run --preview-features malware-check vulture . --min-confidence 100 --exclude "*/.venv/*"
+        pass_filenames: false
+        language: system
+        types: [python]
+
+      - id: pylint
+        name: pylint
+        entry: uv run --preview-features malware-check pylint src tests --fail-under=9.0
+        pass_filenames: false
+        language: system
+        types: [python]
