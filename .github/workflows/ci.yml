@@ -41,8 +41,20 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
-      # - name: Run Bandit (Security scan)
-        # run: uv run bandit -r . -x ./tests
+      - name: Run Bandit (Security scan)
+        run: uvx bandit -ll -r . -x tests,venv,.venv
+
+  # gitleaks:
+    # runs-on:
+      # ubuntu-latest
+    # steps:
+      # - name: Checkout code
+        # uses: actions/checkout@v4
+        # with: fetch-depth: 0
+
+      # - name: Run Gitleaks
+        # uses: gitleaks/gitleaks-action@v2
+        # env: GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   package:
     needs: quality

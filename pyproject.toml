@@ -92,3 +92,9 @@ disable = [
 
 [tool.pylint.similarities]
 min-similarity-lines = 12
+
+[tool.bandit]
+targets = ["."]
+exclude_dirs = ["tests", "venv", ".venv"]
+skips = ["B101"]        # Optional: Skips assert warnings
+sev_level = "MEDIUM"    # Or "LOW" if you want to track smaller issues 
