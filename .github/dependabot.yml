@@ -1,0 +1,39 @@
+<<<<<<< HEAD
+=======
+# To get started with Dependabot version updates, you'll need to specify which
+# package ecosystems to update and where the package manifests are located.
+# Please see the documentation for all configuration options:
+# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+>>>>>>> 65e4ad064f801ee255fdcedb813d8f42cf02525a
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      actions-updates:
+        patterns: ["*"]
+
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"         # daily / weekly / monthly
+    cooldown:
+<<<<<<< HEAD
+        default-days: 7
+=======
+      default-days: 7
+>>>>>>> 65e4ad064f801ee255fdcedb813d8f42cf02525a
+    groups:                      # define Pull-Requests unite groups
+      security-updates:
+        patterns:
+          - "*"
+      version-updates:
+        patterns:
+<<<<<<< HEAD
+          - "*"
+=======
+          - "*"
+>>>>>>> 65e4ad064f801ee255fdcedb813d8f42cf02525a
