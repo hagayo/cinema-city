@@ -11,7 +11,7 @@ updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"         # daily / weekly / monthly
+      interval: "daily"         # daily / weekly / monthly
     cooldown:
       default-days: 7
     groups:                      # define Pull-Requests unite groups
