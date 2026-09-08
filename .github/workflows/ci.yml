@@ -44,6 +44,9 @@ jobs:
       - name: Run Bandit (Security scan)
         run: uvx bandit -ll -r . -x tests,venv,.venv
 
+      # - name: Run OSV-Scanner (Vulnerability scan)
+        # run: uv run --with osv-scanner osv-scanner --lockfile=uv.lock
+
   gitleaks:
     runs-on:
       ubuntu-latest
@@ -58,20 +61,27 @@ jobs:
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # trufflehog:
-    # runs-on: ubuntu-latest
-    # steps:
-      # - name: Checkout code
-        # uses: actions/checkout@v4
-        # with:
-          # fetch-depth: 0    # checks all commits history
+  trufflehog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # checks all commits history
 
-      # - name: TruffleHog OSS Scan
-        # uses: trufflesecurity/trufflehog@main
-        # with:
-          # base: ${{ github.event.repository.default_branch }}
-          # head: HEAD
-          # extra_args: --results=verified    # fail only on verified secrets
+      - name: TruffleHog OSS Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --results=verified    # fail only on verified secrets
+
+  osv-scan:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.0"
 
   package:
     needs: quality
