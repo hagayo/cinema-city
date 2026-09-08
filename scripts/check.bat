@@ -43,6 +43,14 @@ echo OK: Ruff format check passed.
 
 echo.
 echo ========================================
+echo Running Bandit (Security scan)
+echo ========================================
+run: uvx bandit -ll -r . -x tests,venv,.venv
+if errorlevel 1 goto bandit_failed
+echo OK: Bandit Security-Scan passed.
+
+echo.
+echo ========================================
 echo ALL CHECKS PASSED
 echo ========================================
 exit /b 0
@@ -71,4 +79,9 @@ exit /b 1
 :format_failed
 echo.
 echo ERROR: Ruff format check failed.
+exit /b 1
+
+:bandit_failed
+echo.
+echo ERROR: Bandit Security-Scan failed.
 exit /b 1
