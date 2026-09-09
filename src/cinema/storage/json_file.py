@@ -65,7 +65,7 @@ def atomic_write_json(file_path: Path, data: Any) -> None:
             temporary_file.flush()
             os.fsync(temporary_file.fileno())
 
-        os.replace(temporary_path, file_path)
+        temporary_path.replace(file_path)
     finally:
         if temporary_path is not None and temporary_path.exists():
             temporary_path.unlink()

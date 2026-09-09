@@ -1,6 +1,6 @@
 [project]
 name = "cinema-city"
-version = "10.5.3"
+version = "10.5.2"
 description = "Cinema-Booking project with production style structure, Provider-independent, plus CLI, Web, local JSON, and Neon-DB built-in adapters"
 readme = "README.md"
 requires-python = ">=3.12"

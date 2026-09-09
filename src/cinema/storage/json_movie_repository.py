@@ -62,35 +62,34 @@ class JsonMovieRepository(MovieRepository):
         if movie.movie_id is not None:
             raise StorageError("A new movie must not already have an ID")
         try:
-            with exclusive_lock(self._state_lock_path):
-                with exclusive_file_lock(self._file_path):
-                    last_movie_id, data = self._read_document_for_write()
-                    movies = [self._deserialize(item) for item in data]
-                    self._validate_unique_movies(movies, last_movie_id)
+            with exclusive_lock(self._state_lock_path), exclusive_file_lock(self._file_path):
+                last_movie_id, data = self._read_document_for_write()
+                movies = [self._deserialize(item) for item in data]
+                self._validate_unique_movies(movies, last_movie_id)
 
-                    normalized_title = movie.title.strip().casefold()
-                    if any(movie.title.strip().casefold() == normalized_title for movie in movies):
-                        raise StorageError(f'Movie title "{movie.title.strip()}" already exists')
+                normalized_title = movie.title.strip().casefold()
+                if any(movie.title.strip().casefold() == normalized_title for movie in movies):
+                    raise StorageError(f'Movie title "{movie.title.strip()}" already exists')
 
-                    persisted = Movie(
-                        movie_id=last_movie_id + 1,
-                        title=movie.title,
-                        duration_minutes=movie.duration_minutes,
-                        description=movie.description,
-                        genre=movie.genre,
-                        ticket_price=movie.ticket_price,
-                    )
-                    data.append(self._serialize(persisted))
-                    atomic_write_json(
-                        self._file_path,
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "last_movie_id": persisted.movie_id,
-                            "movies": data,
-                        },
-                    )
-                    assert persisted.movie_id is not None
-                    return persisted.movie_id
+                movie_id = last_movie_id + 1
+                persisted = Movie(
+                    movie_id=movie_id,
+                    title=movie.title,
+                    duration_minutes=movie.duration_minutes,
+                    description=movie.description,
+                    genre=movie.genre,
+                    ticket_price=movie.ticket_price,
+                )
+                data.append(self._serialize(persisted))
+                atomic_write_json(
+                    self._file_path,
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "last_movie_id": movie_id,
+                        "movies": data,
+                    },
+                )
+                return movie_id
         except StorageError:
             raise
         except (

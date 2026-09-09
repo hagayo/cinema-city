@@ -84,8 +84,9 @@ class JsonUserRepository(UserRepository):
             with exclusive_file_lock(self._file_path):
                 last_user_id, data = self._read_document_for_write()
                 users = self._deserialize_all(data)
+                user_id = last_user_id + 1
                 persisted = User(
-                    user_id=last_user_id + 1,
+                    user_id=user_id,
                     auth_provider=normalized.auth_provider,
                     auth_subject=normalized.auth_subject,
                     full_name=normalized.full_name,
@@ -94,9 +95,8 @@ class JsonUserRepository(UserRepository):
                 )
                 users.append(persisted)
                 self._validate_unique_identity(users)
-                self._write(persisted.user_id, users)
-                assert persisted.user_id is not None
-                return persisted.user_id
+                self._write(user_id, users)
+                return user_id
         except (StorageError, UserIdentityConflictError):
             raise
         except (

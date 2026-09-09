@@ -87,29 +87,28 @@ class JsonShowRepository(ShowRepository):
             raise StorageError("New shows must not already have IDs")
 
         try:
-            with exclusive_lock(self._state_lock_path):
-                with exclusive_file_lock(self._file_path):
-                    last_show_id, data = self._read_document_for_write()
-                    created = [
-                        MovieShow(
-                            show_id=last_show_id + index,
-                            movie_id=show.movie_id,
-                            hall_id=show.hall_id,
-                            start_time=show.start_time,
-                            ticket_price=show.ticket_price,
-                        )
-                        for index, show in enumerate(shows, start=1)
-                    ]
-                    data.extend(self._serialize(show) for show in created)
-                    atomic_write_json(
-                        self._file_path,
-                        {
-                            "schema_version": SCHEMA_VERSION,
-                            "last_show_id": created[-1].show_id,
-                            "shows": data,
-                        },
+            with exclusive_lock(self._state_lock_path), exclusive_file_lock(self._file_path):
+                last_show_id, data = self._read_document_for_write()
+                created = [
+                    MovieShow(
+                        show_id=last_show_id + index,
+                        movie_id=show.movie_id,
+                        hall_id=show.hall_id,
+                        start_time=show.start_time,
+                        ticket_price=show.ticket_price,
                     )
-                    return [self._require_id(show) for show in created]
+                    for index, show in enumerate(shows, start=1)
+                ]
+                data.extend(self._serialize(show) for show in created)
+                atomic_write_json(
+                    self._file_path,
+                    {
+                        "schema_version": SCHEMA_VERSION,
+                        "last_show_id": created[-1].show_id,
+                        "shows": data,
+                    },
+                )
+                return [self._require_id(show) for show in created]
         except StorageError:
             raise
         except (

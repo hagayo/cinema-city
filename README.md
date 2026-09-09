@@ -3,7 +3,7 @@
 
 # Cinema City
 
-Current version: **10.5.2**
+Current version: **10.5.3**
 
 Production-style Python teaching project for cinema scheduling, booking,
 repository abstractions, persistence, testing, and future Cloudflare D1 integration.
@@ -145,7 +145,7 @@ users.json
 bookings.json
 ```
 
-פעולות read-modify-write מוגנות בנעילה, נכתבות לקובץ זמני, עוברות `fsync` ומוחלפות באמצעות `os.replace()`.
+פעולות read-modify-write מוגנות בנעילה, נכתבות לקובץ זמני, עוברות `fsync` ומוחלפות באמצעות `Path.replace()`.
 
 ### Neon
 
@@ -253,8 +253,8 @@ ruff format --check
 ## Docker
 
 ```bash
-docker build -t cinema-city:10.5.2 .
-docker run --rm -p 8080:8080 --env-file .env.production cinema-city:10.5.2
+docker build -t cinema-city:10.5.3 .
+docker run --rm -p 8080:8080 --env-file .env.production cinema-city:10.5.3
 ```
 
 לפריסה מלאה והקשחת אבטחה ראו:

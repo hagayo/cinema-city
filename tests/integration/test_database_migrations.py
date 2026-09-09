@@ -34,7 +34,7 @@ def test_initial_migration_seed_and_downgrade(tmp_path: Path) -> None:
 
     command.upgrade(config, "head")
     engine = create_engine(database_url)
-    assert DOMAIN_TABLES <= set(inspect(engine).get_table_names())
+    assert set(inspect(engine).get_table_names()) >= DOMAIN_TABLES
     assert {
         constraint["name"] for constraint in inspect(engine).get_unique_constraints("booking_seats")
     } == {

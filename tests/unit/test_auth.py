@@ -26,7 +26,9 @@ from cinema.storage import create_json_storage_service
 def test_noauth_uses_server_configured_role_and_local_user(tmp_path: Path) -> None:
     users = create_json_storage_service(data_dir=tmp_path / "data").user_repository
     service = NoAuthAuthenticationService(users, Role.MANAGER, "admin@local.invalid")
-    first = service.authenticate(RequestCredentials(bearer_token="browser-value-is-ignored"))
+    first = service.authenticate(
+        RequestCredentials(bearer_token="browser-value-is-ignored")  # noqa: S106
+    )
     second = service.authenticate(RequestCredentials())
     assert first == second
     assert first.role is Role.MANAGER
@@ -153,7 +155,7 @@ def test_http_clerk_profile_client_uses_verified_primary_data(
             "phone_numbers": [{"id": "phone_1", "phone_number": "+972501234567"}],
         },
     )
-    monkeypatch.setattr("cinema.auth.clerk.httpx.get", lambda *args, **kwargs: response)
+    monkeypatch.setattr("cinema.auth.clerk.httpx.get", lambda *_args, **_kwargs: response)
     profile = HttpClerkProfileClient("https://api.clerk.test", "secret").fetch("user_1")
     assert profile.full_name == "Dana Cohen"
     assert profile.email == "dana@example.com"

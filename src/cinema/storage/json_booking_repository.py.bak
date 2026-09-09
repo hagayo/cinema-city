@@ -131,15 +131,15 @@ class JsonBookingRepository(BookingRepository):
                         f"Seat ID {seat_id} is already booked for show {request.show_id}"
                     )
 
-                booking_id = last_booking_id + 1
                 booking = Booking(
-                    booking_id=booking_id,
+                    booking_id=last_booking_id + 1,
                     user_id=request.user_id,
                     show_id=request.show_id,
                 )
+                assert booking.booking_id is not None
                 rows = [
                     BookingSeat(
-                        booking_id=booking_id,
+                        booking_id=booking.booking_id,
                         show_id=request.show_id,
                         seat_id=seat_id,
                     )
@@ -152,12 +152,12 @@ class JsonBookingRepository(BookingRepository):
                     self._file_path,
                     {
                         "schema_version": SCHEMA_VERSION,
-                        "last_booking_id": booking_id,
+                        "last_booking_id": booking.booking_id,
                         "bookings": bookings_data,
                         "booking_seats": booking_seats_data,
                     },
                 )
-                return booking_id
+                return booking.booking_id
         except (StorageError, SeatAlreadyBookedError):
             raise
         except (
