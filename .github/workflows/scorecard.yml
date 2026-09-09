@@ -46,6 +46,6 @@ jobs:
 
       # for some envs v3 has better compatibility
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@db488ddf0b875d6141a02931e9c20a9a1d473499 # v4.37.8
+        uses: github/codeql-action/upload-sarif@db488ddef3bf6cb639b32c2e9a7c0a7ea8271d28 # v4.37.8
         with:
           sarif_file: results.sarif
