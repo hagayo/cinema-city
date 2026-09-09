@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@3d3c42e2a4cd39634e7ca3046f41e57c631b191a # v7.0.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Run actionlint
-        uses: rhysd/actionlint-action@7374cbaf0f3299723528b8cf442fb83501a40306 # v1.11.1
+        uses: raven-actions/actionlint@v2
+        # uses: rhysd/actionlint-action@7374cbaf0f3299723528b8cf442fb83501a40306 # v1.11.1
