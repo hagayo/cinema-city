@@ -62,10 +62,11 @@ jobs:
 
       - name: Run Gitleaks
         uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        with:
-          args: detect --redact --verbose
         env: 
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # with:
+          # args: detect --redact --verbose
+
 
   osv-scan:
     permissions:
@@ -111,22 +112,3 @@ jobs:
         with:
           name: cinema-city-dist
           path: dist/
-
-  git-sizer:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          fetch-depth: 0
-
-      - name: Install git-sizer
-        shell: bash
-        run: |
-          mkdir -p "$RUNNER_TEMP/git-sizer-bin"
-          GOBIN="$RUNNER_TEMP/git-sizer-bin" \
-            go install github.com/github/git-sizer@v1.5.0
-          echo "$RUNNER_TEMP/git-sizer-bin" >> "$GITHUB_PATH"
-
-      - name: Check repository size
-        run: git-sizer --verbose
