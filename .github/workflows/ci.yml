@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@ca80e816a7516104bc17904000306c559868846c # v2.3.2
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         with:
           args: detect --redact --verbose
         env: 
@@ -119,20 +119,14 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           fetch-depth: 0
-  
+
       - name: Install git-sizer
+        shell: bash
         run: |
-          # Fetch the latest release version from official GitHub API
-          VERSION=$(curl -s https://github.com | grep -oP '"tag_name": "\K[^"]+')
-          VERSION_NUM=${VERSION#v}
-          
-          # Download the Linux AMD64 package
-          curl -L -o git-sizer.zip "https://github.com{VERSION}/git-sizer-${VERSION_NUM}-linux-amd64.zip"
-          
-          unzip git-sizer.zip
-          sudo mv git-sizer /usr/local/bin/
-          git-sizer --version
-  
-      - name: Run git-sizer
-        run: |
-          git-sizer --verbose
+          mkdir -p "$RUNNER_TEMP/git-sizer-bin"
+          GOBIN="$RUNNER_TEMP/git-sizer-bin" \
+            go install github.com/github/git-sizer@v1.5.0
+          echo "$RUNNER_TEMP/git-sizer-bin" >> "$GITHUB_PATH"
+
+      - name: Check repository size
+        run: git-sizer --verbose
