@@ -14,13 +14,9 @@ updates:
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
-      interval: "weekly"         # daily / weekly / monthly
+      interval: "weekly"
     cooldown:
       default-days: 7
-    groups:                      # define Pull-Requests unite groups
+    groups:
       uv-version-updates:
-        applies-to: "version-updates"
-        patterns: ["*"]
-      uv-security-updates:
-        applies-to: "security-updates"
         patterns: ["*"]

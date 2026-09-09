@@ -62,7 +62,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "A", "C4", "UP", "S", "ARG", "PTH", "SIM", ]
 deny = ["ALL"] 
-ignore = ["E501",]
+ignore = [
+  "E501",
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101", "S105", "ARG001", ]
@@ -101,13 +103,17 @@ disable = [
     "too-many-locals",
     "too-many-positional-arguments",
     "try-except-raise",
+    "line-too-long",
+    "bad-continuation",
+    "wrong-import-order",
+    "ungrouped-imports",
 ]
 
 [tool.pylint.similarities]
 min-similarity-lines = 12
 
 [tool.bandit]
-targets = ["."]
+targets = ["src"]
 exclude_dirs = ["tests", "venv", ".venv", "build", "dist"]
 skips = ["B101", "B104"]    # Skips assert warnings, and bind to 0.0.0.0
 sev_level = "MEDIUM"        # Or "LOW" if you want to track smaller issues 
