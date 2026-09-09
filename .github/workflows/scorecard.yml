@@ -44,7 +44,8 @@ jobs:
           path: results.sarif
           retention-days: 5
 
+      # for some envs v3 has better compatibility
       - name: "Upload to code-scanning"
-        uses: github/codeql-action/upload-sarif@v4   # for some envs v3 has better compatibility
+        uses: github/codeql-action/upload-sarif@db488ddf0b875d6141a02931e9c20a9a1d473499 # v4.37.8
         with:
           sarif_file: results.sarif

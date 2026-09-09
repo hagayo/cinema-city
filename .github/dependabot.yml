@@ -10,6 +10,8 @@ updates:
           - "actions/checkout"
           - "actions/upload-artifact"
           - "gitleaks/gitleaks-action"
+    ignore:
+      - dependency-name: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml"
 
   - package-ecosystem: "uv"
     directory: "/"
