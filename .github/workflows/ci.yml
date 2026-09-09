@@ -44,8 +44,8 @@ jobs:
       - name: Run Bandit (Security scan)
         run: uvx bandit -ll -r . -x tests,venv,.venv
 
-      # - name: Run OSV-Scanner (Vulnerability scan)
-        # run: uv run --with osv-scanner osv-scanner --lockfile=uv.lock
+      - name: Run OSV-Scanner (Vulnerability scan)
+        run: uv run --with osv-scanner osv-scanner --lockfile=uv.lock
 
   gitleaks:
     runs-on:
@@ -79,12 +79,12 @@ jobs:
           head: HEAD
           extra_args: --results=verified    # fail only on verified secrets
 
-  osv-scan:
-    permissions:
-      actions: read
-      contents: read
-      security-events: write
-    uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.0"
+  # osv-scan:
+    # permissions:
+      # actions: read
+      # contents: read
+      # security-events: write
+    # uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.0"
 
   package:
     needs: quality
@@ -105,3 +105,35 @@ jobs:
         with:
           name: cinema-city-dist
           path: dist/
+
+  git-sizer:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Clone the full, non-shallow repository history
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Step 2: Download and install the latest git-sizer binary
+      - name: Install git-sizer
+        run: |
+          # Fetch the latest release version from GitHub API
+          VERSION=$(curl -s https://github.com | grep -oP '"tag_name": "\K[^"]+')
+          # Strip the 'v' prefix if present to format the download URL
+          VERSION_NUM=${VERSION#v}
+          
+          # Download the Linux AMD64 package
+          curl -L -o git-sizer.zip "https://github.com{VERSION}/git-sizer-${VERSION_NUM}-linux-amd64.zip"
+          
+          # Unzip and move the executable to a directory in the PATH
+          unzip git-sizer.zip
+          sudo mv git-sizer /usr/local/bin/
+          
+          # Verify installation
+          git-sizer --version
+
+      # Step 3: Run git-sizer and output metrics
+      - name: Run git-sizer
+        run: |
+          git-sizer --verbose
