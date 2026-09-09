@@ -43,8 +43,8 @@ jobs:
         run: uv run ruff format --check .
 
       - name: Run Bandit (Security scan)
-        # run: uvx bandit -ll -r . -x tests,venv,.venv
-        run: uv run bandit -c pyproject.toml -r .
+        run: uvx bandit -ll -r . -x tests,venv,.venv
+        # run: uv run bandit -c pyproject.toml -r .
 
       # - name: Run OSV-Scanner (Vulnerability scan)
         # run: uv run --with osv-scanner osv-scanner --lockfile=uv.lock
