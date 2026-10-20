@@ -86,8 +86,11 @@ src/cinema/
 └── db_seed.py         # נתוני Seed מפורשים לאחר migration
 
 database/
-├── migrations/        # היסטוריית Alembic
-└── schema.sql         # תמונת מצב מלאה של PostgreSQL
+├── neon/
+    ├── migrations/    # היסטוריית Alembic
+    ├── schema.sql     # תמונת מצב מלאה של PostgreSQL
+└── d1/
+    ├── schema.sql     # all postgres tables definitions
 ```
 
 כיוון התלות:
@@ -163,12 +166,12 @@ uv run cinema-db-seed
 
 `cinema-db-seed` הוא idempotent ומוסיף רק את הקולנוע, שלושת האולמות והמושבים החסרים במסד ריק. השרת עצמו אינו יוצר או משנה טבלאות ואינו זקוק להרשאת DDL.
 
-המיגרציות תחת `database/migrations/versions` הן היסטוריית השינויים. `database/schema.sql` הוא snapshot קריא וניתן להרצה של המבנה הנוכחי, אך אינו נערך ידנית. להפקה מחדש ב-PowerShell:
+המיגרציות תחת `database/neon/migrations/versions` הן היסטוריית השינויים. `database/neon/schema.sql` הוא snapshot קריא וניתן להרצה של המבנה הנוכחי, אך אינו נערך ידנית. להפקה מחדש ב-PowerShell:
 
 ```powershell
 $env:STORAGE_BACKEND = "neon"
 $env:NEON_DATABASE_URL = "postgresql://localhost/cinema_city"
-uv run alembic upgrade head --sql | Set-Content -Encoding utf8 database/schema.sql
+uv run alembic upgrade head --sql | Set-Content -Encoding utf8 database/neon/schema.sql
 ```
 
 לפני החלת migration שנוצר באמצעות `--autogenerate`, בודקים ועורכים אותו ידנית לפי הצורך. במסד הנתונים נאכפים PK, FK, טווחים, זהות חיצונית ייחודית ו-`UNIQUE(show_id, seat_id)`.

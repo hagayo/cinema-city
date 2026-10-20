@@ -34,8 +34,8 @@ D1 ו-MongoDB הם ערכי Configuration שמורים. בחירה בהם נכש
 ה-PostgreSQL adapter פותח חיבורים ומממש Repositories בלבד. הוא אינו יוצר טבלאות ואינו טוען נתוני Seed בזמן עליית היישום.
 
 - `sqlalchemy_schema.py` מגדיר את ה-target metadata עבור הקוד ו-Alembic.
-- `database/migrations` שומר היסטוריית שינויים ניתנת לשדרוג ולחזרה.
-- `database/schema.sql` הוא snapshot נגזר לצפייה ולהרצה חיצונית.
+- `database/neon/migrations` שומר היסטוריית שינויים ניתנת לשדרוג ולחזרה.
+- `database/neon/schema.sql` הוא snapshot נגזר לצפייה ולהרצה חיצונית.
 - `cinema-db-seed` מוסיף בנפרד את תצורת הקולנוע הראשונית.
 
 Alembic שייך ל-adapter של PostgreSQL בלבד ואינו משנה את חוזי ה-Repository. Backend עתידי יקבל מנגנון migration התואם לטכנולוגיה שלו.

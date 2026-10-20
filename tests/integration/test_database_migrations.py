@@ -58,7 +58,7 @@ def test_initial_migration_seed_and_downgrade(tmp_path: Path) -> None:
 
 
 def test_schema_sql_contains_complete_initial_snapshot() -> None:
-    schema_sql = (PROJECT_ROOT / "database" / "schema.sql").read_text(encoding="utf-8")
+    schema_sql = (PROJECT_ROOT / "database" / "neon" / "schema.sql").read_text(encoding="utf-8")
     assert "20260828_0001" in schema_sql
     for table_name in DOMAIN_TABLES:
         assert f"CREATE TABLE {table_name}" in schema_sql

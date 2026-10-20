@@ -54,8 +54,8 @@ Rollback של image אינו Rollback של schema. שינויי schema עתיד�
 
 ## ניהול Schema
 
-- `database/migrations/versions` מכיל את היסטוריית Alembic המחייבת.
-- `database/schema.sql` הוא snapshot קריא של המבנה הנוכחי לשימוש חיצוני.
+- `database/neon/migrations/versions` מכיל את היסטוריית Alembic המחייבת.
+- `database/neon/schema.sql` הוא snapshot קריא של המבנה הנוכחי לשימוש חיצוני.
 - השרת לעולם אינו מפעיל `metadata.create_all()`.
 - Migration חדש נוצר באמצעות `uv run alembic revision --autogenerate -m "description"`, נבדק ידנית ונשמר ב-Git.
 - במסד Neon ישן שכבר מכיל טבלאות מלפני Alembic, אין להריץ את המיגרציה הראשונית אוטומטית. יש לגבות, להשוות ל-`schema.sql`, ואז לבצע baseline מבוקר או ליצור מסד חדש.
