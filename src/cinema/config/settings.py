@@ -1,11 +1,12 @@
 """Validated settings loaded once at the application composition root."""
 
 import os
+import re
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from cinema.exceptions import ConfigurationError
@@ -51,6 +52,7 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore",
         env_file_encoding="utf-8",
+        hide_input_in_errors=True,
     )
 
     app_env: AppEnvironment = AppEnvironment.LOCAL
@@ -84,6 +86,40 @@ class Settings(BaseSettings):
     d1_api_token: str = ""
     mongodb_uri: str = ""
     mongodb_database: str = "cinema_city"
+
+    billing_provider: Literal["disabled", "fake", "paddle"] = "disabled"
+    paddle_env: str = "sandbox"
+    paddle_api_key: SecretStr = SecretStr("")
+    paddle_client_token: str = ""
+    paddle_test_price_id: str = ""
+    paddle_webhook_secret: SecretStr = SecretStr("")
+    paddle_payment_link_enabled: bool = False
+
+    @property
+    def paddle_sandbox_enabled(self) -> bool:
+        return self.billing_provider == "paddle"
+
+    @model_validator(mode="after")
+    def validate_paddle_sandbox(self) -> "Settings":
+        if self.paddle_payment_link_enabled and (
+            self.paddle_env != "sandbox" or not self.paddle_client_token.startswith("test_")
+        ):
+            raise ValueError(
+                "Sandbox payment link requires PADDLE_ENV=sandbox and a test_ client token"
+            )
+        if not self.paddle_sandbox_enabled:
+            return self
+        if self.app_env is AppEnvironment.PRODUCTION or self.paddle_env != "sandbox":
+            raise ValueError(
+                "Paddle test checkout requires a non-production app and PADDLE_ENV=sandbox"
+            )
+        if not self.paddle_api_key.get_secret_value().startswith("pdl_sdbx_apikey_"):
+            raise ValueError("PADDLE_API_KEY must be a sandbox API key")
+        if not self.paddle_client_token.startswith("test_"):
+            raise ValueError("PADDLE_CLIENT_TOKEN must be a sandbox client-side token")
+        if not re.fullmatch(r"pri_[a-z0-9]{26}", self.paddle_test_price_id):
+            raise ValueError("PADDLE_TEST_PRICE_ID must be a Paddle price ID")
+        return self
 
     @property
     def manager_email_set(self) -> frozenset[str]:

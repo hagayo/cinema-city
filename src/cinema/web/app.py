@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import uvicorn
 from fastapi import APIRouter, Depends, FastAPI, Request
+from fastapi import Path as ApiPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -75,6 +76,21 @@ def create_app(
     if resolved_settings.api_mode in (ApiMode.COMBINED, ApiMode.MANAGER):
         app.include_router(_manager_router(dependencies))
     _register_pages(app, resolved_settings.api_mode)
+    if resolved_settings.paddle_payment_link_enabled and resolved_settings.api_mode in (
+        ApiMode.COMBINED,
+        ApiMode.CUSTOMER,
+    ):
+
+        @app.get("/paddle-payment", include_in_schema=False)
+        def paddle_payment_link_page() -> FileResponse:
+            return FileResponse(WEB_ROOT / "paddle-payment.html")
+
+    if dependencies.payments and resolved_settings.api_mode in (ApiMode.COMBINED, ApiMode.CUSTOMER):
+
+        @app.get("/sandbox-payment", include_in_schema=False)
+        def sandbox_payment_page() -> FileResponse:
+            return FileResponse(WEB_ROOT / "sandbox-payment.html")
+
     return app
 
 
@@ -98,6 +114,19 @@ def _public_router(container: ApplicationContainer) -> APIRouter:
                 else ""
             ),
             "apiMode": settings.api_mode.value,
+            "paddlePaymentLink": {
+                "enabled": settings.paddle_payment_link_enabled
+                and settings.api_mode is not ApiMode.MANAGER,
+                "clientToken": settings.paddle_client_token
+                if settings.paddle_payment_link_enabled and settings.api_mode is not ApiMode.MANAGER
+                else "",
+            },
+            "paddle": {
+                "enabled": container.payments is not None
+                and settings.api_mode is not ApiMode.MANAGER,
+                "environment": "sandbox",
+                "clientToken": settings.paddle_client_token if container.payments else "",
+            },
         }
 
     @router.get("/movies")
@@ -119,6 +148,20 @@ def _customer_router(container: ApplicationContainer) -> APIRouter:
     router = APIRouter(prefix="/api/customer", tags=["customer"])
     authenticate = _auth_dependency(container.auth.customer, require_manager=False)
     AuthenticatedCustomer = Annotated[AuthContext, Depends(authenticate)]
+
+    if container.payments is not None:
+        payments = container.payments
+
+        @router.post("/payments/sandbox-checkout", status_code=201)
+        def sandbox_checkout(auth: AuthenticatedCustomer) -> dict[str, str]:
+            return payments.create_checkout(auth.user_id)
+
+        @router.get("/payments/sandbox-checkout/{transaction_id}")
+        def sandbox_checkout_status(
+            transaction_id: Annotated[str, ApiPath(pattern=r"^txn_[a-z0-9]{26}$")],
+            auth: AuthenticatedCustomer,
+        ) -> dict[str, str]:
+            return payments.transaction_status(transaction_id, auth.user_id)
 
     @router.post("/bookings", status_code=201)
     def create_booking(

@@ -129,6 +129,12 @@ Authorization: Bearer <Clerk session token>
 MANAGER_EMAILS=admin@example.com,manager@example.com
 ```
 
+## בדיקת תשלום Paddle Sandbox
+
+נוסף מסך בדיקה נפרד ב־`/sandbox-payment`, הזמין כשמוגדר `BILLING_PROVIDER=paddle`
+עם פרטי Sandbox תקינים. הוא יוצר עסקת בדיקה חד־פעמית ומאמת את הסטטוס מול Paddle,
+בלי ליצור הזמנת קולנוע. הוראות הגדרה והפעלה: [Paddle Sandbox](docs/paddle-sandbox.md).
+
 ## Storage
 
 ### JSON מקומי

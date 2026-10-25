@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cinema City — בדיקת תשלום</title>
+    <link rel="stylesheet" href="/assets/styles.css">
+    <script type="module" src="/assets/sandbox-payment.js"></script>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/">Cinema City</a>
+      <div id="auth-controls" class="auth-controls" aria-live="polite"></div>
+    </header>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Paddle Sandbox · מצב בדיקה</p>
+        <h1>בדיקת תשלום חד־פעמי</h1>
+        <p>תשלום מדומה בלבד. הבדיקה אינה יוצרת הזמנת קולנוע ואינה שומרת מושבים.</p>
+      </section>
+      <section class="panel" aria-label="תשלום בדיקה">
+        <p>המחיר והמטבע של מוצר הבדיקה יוצגו בחלון התשלום, לפני האישור.</p>
+        <p>כרטיס בדיקה: <bdi>4242 4242 4242 4242</bdi> · תוקף עתידי · CVC של שלוש ספרות.</p>
+        <p>השתמשו בכרטיס הבדיקה בלבד וודאו שמופיע Test Mode בחלון.</p>
+        <button id="open-checkout" class="button" type="button" disabled>פתיחת תשלום בדיקה</button>
+        <button id="verify-payment" class="button secondary" type="button" disabled>בדיקת סטטוס ב־Paddle</button>
+        <p id="transaction-reference"></p>
+        <p id="status" class="status" role="status" aria-live="polite">טוען את סביבת הבדיקה…</p>
+      </section>
+    </main>
+  </body>
+</html>

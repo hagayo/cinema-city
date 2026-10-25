@@ -16,6 +16,7 @@ from cinema.auth.clerk import (
 from cinema.auth.noauth import NoAuthAuthenticationService
 from cinema.config import AuthProvider, Settings, StorageBackend
 from cinema.exceptions import ConfigurationError
+from cinema.payments.paddle import PaddleSandboxClient
 from cinema.services import CinemaManager, SchedulingService
 from cinema.storage import StorageService, create_json_storage_service
 from cinema.storage.sqlalchemy_backend import create_neon_storage_service
@@ -35,6 +36,7 @@ class ApplicationContainer:
     bookings: BookingApplicationService
     manager: ManagerApplicationService
     auth: AuthAdapters
+    payments: PaddleSandboxClient | None = None
 
 
 def create_container(settings: Settings) -> ApplicationContainer:
@@ -54,6 +56,13 @@ def create_container(settings: Settings) -> ApplicationContainer:
         bookings=BookingApplicationService(storage, catalog),
         manager=ManagerApplicationService(storage, cinema_manager, scheduler),
         auth=create_auth_adapters(settings, storage),
+        payments=(
+            PaddleSandboxClient(
+                settings.paddle_api_key.get_secret_value(), settings.paddle_test_price_id
+            )
+            if settings.paddle_sandbox_enabled
+            else None
+        ),
     )
 
 
